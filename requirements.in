@@ -1,0 +1,15 @@
+flask
+flask-sqlalchemy
+flask-bcrypt
+flask-cors
+flask-mail
+flask-caching
+flask-httpauth
+pillow
+PyJWT
+requests
+howlongtobeatpy
+ratelimit
+python-dotenv
+gunicorn
+pytz
