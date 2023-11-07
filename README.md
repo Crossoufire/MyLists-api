@@ -61,4 +61,4 @@ IGDB_API_KEY=<igdb-api-key>
 Then run the command `python mylists.py`. The API backend will be served at [http://localhost:5000](http://localhost:5000).
 
 ## Contact
-<contact.us.at.mylists@gamil.com>
+<contact.us.at.mylists@gmail.com>
