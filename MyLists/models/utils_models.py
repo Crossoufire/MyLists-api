@@ -43,8 +43,8 @@ class MediaMixin:
         # Get media models
         media, _, media_genre, *_ = get_models_group(self.GROUP)
 
-        # Check genre unknown
-        if self.genres_list[0] == "Unknown":
+        # Check genre empty or unknown
+        if len(self.genres_list) == 0 or self.genres_list[0] == "Unknown":
             return []
 
         similar_genres = (db.session.query(media)

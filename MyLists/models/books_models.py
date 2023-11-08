@@ -168,6 +168,7 @@ class BooksList(MediaListMixin, db.Model):
         # Add more info
         media_dict["media_cover"] = self.media.media_cover
         media_dict["media_name"] = self.media.name
+        media_dict["total_pages"] = self.media.pages
         media_dict["all_status"] = self.Status.to_list()
 
         return media_dict

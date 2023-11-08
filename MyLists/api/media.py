@@ -114,7 +114,8 @@ def media_details_form(media_type: MediaType, media_id: int):
         return abort(400)
 
     # Add genres if BOOKS
-    if media_type == MediaType.BOOKS and (len(data.get("genres", []) or 0)) != 0:
+    print(data.get("genres"))
+    if media_type == MediaType.BOOKS and (len(data.get("genres", []) or [])) != 0:
         media_genre.replace_genres(data["genres"], media.id)
 
     # Suppress all non-allowed fields
