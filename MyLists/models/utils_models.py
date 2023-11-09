@@ -15,6 +15,7 @@ class MediaMixin:
     """ Media Mixin class for the SQLAlchemy classes: <Series>, <Anime>, <Movies>, <Games>, and <Books> """
 
     GROUP = None
+    SIMILAR_GENRES = 12
 
     @property
     def actors_list(self) -> List:
@@ -47,15 +48,14 @@ class MediaMixin:
         if len(self.genres_list) == 0 or self.genres_list[0] == "Unknown":
             return []
 
-        similar_genres = (db.session.query(media)
-                          .join(media_genre, media.id == media_genre.media_id)
-                          .filter(media_genre.genre.in_(self.genres_list),
-                                  media_genre.media_id != self.id)
-                          .group_by(media.id)
-                          .having(db.func.count(db.func.distinct(media_genre.genre)) >= 1)
-                          .limit(12).all())
+        sim_genres = (db.session.query(media, db.func.count(db.func.distinct(media_genre.genre)).label("genre_c"))
+                      .join(media_genre, media.id == media_genre.media_id)
+                      .filter(media_genre.genre.in_(self.genres_list), media_genre.media_id != self.id)
+                      .group_by(media.id).having(db.func.count(db.func.distinct(media_genre.genre)) >= 1)
+                      .order_by(desc("genre_c"))
+                      .limit(self.SIMILAR_GENRES).all())
 
-        return [{"media_id" : m.id, "media_name": m.name, "media_cover": m.media_cover} for m in similar_genres]
+        return [{"media_id" : m[0].id, "media_name": m[0].name, "media_cover": m[0].media_cover} for m in sim_genres]
 
     def in_follows_lists(self) -> List[Dict]:
         """ Verify whether the <media> is included in the list of users followed by the <current_user> """

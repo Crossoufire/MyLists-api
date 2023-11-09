@@ -74,6 +74,7 @@ def media_details(media_type: MediaType, media_id: int):
 
     return jsonify(data=data)
 
+
 @media_bp.route("/details/form/<media_type>/<media_id>", methods=["GET", "POST"])
 @token_auth.login_required
 @validate_media_type

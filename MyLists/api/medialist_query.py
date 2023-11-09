@@ -50,19 +50,58 @@ class BaseMediaQuery:
         self.all_genres = self.media_genre.get_available_genres()
         self.all_sorting = self.media_list.get_available_sorting(self.user.add_feeling)
 
+    def _get_sorting(self) -> Any:
+        """ Get the sorting possibilities and sort the query """
+
+        # Check sorting
+        try:
+            sort_filter = self.all_sorting[self.sorting]
+        except KeyError:
+            return abort(400)
+
+        return sort_filter
+
+    def _get_status_filter(self) -> Any:
+        """ Get the status filter from the query """
+
+        # Status Filtering
+        try:
+            status = Status(self.status)
+            status_filter = True
+            if status not in (Status.FAVORITE, Status.SEARCH, Status.ALL):
+                status_filter = (self.media_list.status == status)
+            elif status == Status.FAVORITE:
+                status_filter = (self.media_list.favorite == True)
+        except ValueError:
+            return abort(400)
+
+        return status_filter
+
+    def _get_lang_filter(self) -> Any:
+        """ Get the lang filter from the query """
+
+        lang_filter = True
+        if self.media_type == MediaType.MOVIES:
+            lang_filter = self.media.original_language.like(self.lang) if self.lang != "All" else True
+
+        return lang_filter
+
+    def _get_common_filter(self) -> Any:
+        """ Get the common ids between the current user and other list """
+        return self.media_list.media_id.notin_(self.common_ids) if self.show_common == "false" else True
+
     def _compute_total_and_commons(self):
         """ Get the total quantity of media and the common media/ids """
 
         # Count total media
-        self.total_media = db.session.query(self.media_list.media_id).filter(
-            self.media_list.user_id == self.user.id
-        ).count()
+        self.total_media = (db.session.query(self.media_list.media_id)
+                            .filter(self.media_list.user_id == self.user.id).count())
 
         # Check TOTAL COMMONS
         sub_q = db.session.query(self.media_list.media_id).filter(self.media_list.user_id == current_user.id)
+
         common_ids = db.session.query(self.media_list.media_id).filter(
-            self.media_list.user_id == self.user.id, self.media_list.media_id.in_(sub_q)
-        ).all()
+            self.media_list.user_id == self.user.id, self.media_list.media_id.in_(sub_q)).all()
 
         self.common_ids = [data[0] for data in common_ids]
 
@@ -82,9 +121,9 @@ class SearchMediaQuery(BaseMediaQuery):
         """ Execute the search query on a <media_list> for a specified <user> """
 
         # First query part
-        query_part = db.session.query(self.media_list) \
-            .outerjoin(self.media, self.media.id == self.media_list.media_id) \
-            .outerjoin(self.media_genre, self.media_genre.media_id == self.media.id)
+        query_part = (db.session.query(self.media_list)
+                      .outerjoin(self.media, self.media.id == self.media_list.media_id)
+                      .outerjoin(self.media_genre, self.media_genre.media_id == self.media.id))
 
         # Selection depending on <media_type>
         if self.media_type in (MediaType.SERIES, MediaType.ANIME):
@@ -136,46 +175,6 @@ class SearchMediaQuery(BaseMediaQuery):
 
 class ItemsMediaQuery(BaseMediaQuery):
     """ Subclass for handling the display items query part """
-
-    def _get_sorting(self) -> Any:
-        """ Get the sorting possibilities and sort the query """
-
-        # Check sorting
-        try:
-            sort_filter = self.all_sorting[self.sorting]
-        except KeyError:
-            return abort(400)
-
-        return sort_filter
-
-    def _get_status_filter(self) -> Any:
-        """ Get the status filter from the query """
-
-        # Status Filtering
-        try:
-            status = Status(self.status)
-            status_filter = True
-            if status not in (Status.FAVORITE, Status.SEARCH, Status.ALL):
-                status_filter = (self.media_list.status == status)
-            elif status == Status.FAVORITE:
-                status_filter = (self.media_list.favorite == True)
-        except ValueError:
-            return abort(400)
-
-        return status_filter
-
-    def _get_lang_filter(self) -> Any:
-        """ Get the lang filter from the query """
-
-        lang_filter = True
-        if self.media_type == MediaType.MOVIES:
-            lang_filter = self.media.original_language.like(self.lang) if self.lang != "All" else True
-
-        return lang_filter
-
-    def _get_common_filter(self) -> Any:
-        """ Get the common ids between the current user and other list """
-        return self.media_list.media_id.notin_(self.common_ids) if self.show_common == "false" else True
 
     def _items_query(self):
         """ Get the <media_list> items for a specified <user> """
