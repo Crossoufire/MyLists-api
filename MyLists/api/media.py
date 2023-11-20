@@ -7,9 +7,9 @@ from PIL.Image import Resampling
 from flask import current_app
 from flask import request, jsonify, Blueprint, abort
 from MyLists import db
-from MyLists.API_data import ApiData
+from MyLists.classes.API_data import ApiData
 from MyLists.api.auth import token_auth, current_user
-from MyLists.api.medialist_query import MediaListQuery
+from MyLists.classes.Medialist_query import MediaListQuery
 from MyLists.models.user_models import UserLastUpdate, get_coming_next
 from MyLists.scheduled_tasks.media_refresher import refresh_element_data
 from MyLists.utils.decorators import validate_media_type, media_endpoint_decorator

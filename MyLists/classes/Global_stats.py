@@ -1,4 +1,3 @@
-import json
 from typing import Tuple, Dict
 from sqlalchemy import func, text
 from MyLists import db
@@ -8,7 +7,6 @@ from MyLists.models.movies_models import Movies, MoviesActors, MoviesGenre, Movi
 from MyLists.models.tv_models import (Series, Anime, SeriesList, SeriesGenre, AnimeList, AnimeGenre, AnimeActors,
                                       SeriesActors, SeriesEpisodesPerSeason, AnimeEpisodesPerSeason)
 from MyLists.models.user_models import User
-from MyLists.models.utils_models import MyListsStats
 from MyLists.utils.enums import MediaType, RoleType, Status
 
 
@@ -224,45 +222,3 @@ class GlobalStats:
 
         self.get_query_data(MediaType.BOOKS)
         return db.session.query(func.sum(self.media_list.actual_page)).first()[0] or 0
-
-
-def update_Mylists_stats():
-    """ Update the MyLists global stats """
-
-    # Get global stats
-    stats = GlobalStats()
-
-    total_time = User.get_total_time_spent()
-    media_top = stats.get_top_media()
-    media_genres = stats.get_top_genres()
-    media_actors = stats.get_top_actors()
-    media_authors = stats.get_top_authors()
-    media_developers = stats.get_top_developers()
-    media_directors = stats.get_top_directors()
-    media_dropped = stats.get_top_dropped()
-    media_eps_seas = stats.get_total_eps_seasons()
-    total_movies = stats.get_total_movies()
-
-    total_pages = stats.get_total_book_pages()
-    nb_users, nb_media = stats.get_nb_media_and_users()
-
-    stats = MyListsStats(
-        nb_users=nb_users,
-        nb_media=json.dumps(nb_media),
-        total_time=json.dumps(total_time),
-        top_media=json.dumps(media_top),
-        top_genres=json.dumps(media_genres),
-        top_actors=json.dumps(media_actors),
-        top_directors=json.dumps(media_directors),
-        top_dropped=json.dumps(media_dropped),
-        total_episodes=json.dumps(media_eps_seas),
-        total_seasons=json.dumps(media_eps_seas),
-        total_movies=json.dumps(total_movies),
-        top_authors=json.dumps(media_authors),
-        top_developers=json.dumps(media_developers),
-        total_pages=total_pages,
-    )
-
-    # Add and commit changes
-    db.session.add(stats)
-    db.session.commit()

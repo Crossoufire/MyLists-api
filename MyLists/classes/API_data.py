@@ -16,10 +16,11 @@ from MyLists import db
 from MyLists.models.books_models import Books, BooksGenre, BooksAuthors
 from MyLists.models.games_models import Games, GamesCompanies, GamesPlatforms, GamesGenre
 from MyLists.models.movies_models import Movies, MoviesGenre, MoviesActors
-from MyLists.models.tv_models import Series, SeriesGenre, SeriesActors, SeriesNetwork, SeriesEpisodesPerSeason, \
-    Anime, AnimeGenre, AnimeNetwork, AnimeEpisodesPerSeason, AnimeActors
+from MyLists.models.tv_models import (Series, SeriesGenre, SeriesActors, SeriesNetwork, SeriesEpisodesPerSeason,
+                                      Anime, AnimeGenre, AnimeNetwork, AnimeEpisodesPerSeason, AnimeActors)
 from MyLists.utils.enums import MediaType
 from MyLists.utils.utils import get_subclasses, change_air_format, is_latin, clean_html_text
+
 
 """ --- GENERAL --------------------------------------------------------------------------------------------- """
 
@@ -192,6 +193,9 @@ class ApiTMDB(ApiData):
 
     def _save_api_cover(self, cover_path: str, cover_name: str):
         """ Save the media (Series, Anime or Movies) cover to the local server disk """
+
+        print(cover_path, cover_name)
+        print(f"{self.POSTER_BASE_URL}{cover_path}", f"{self.LOCAL_COVER_PATH}/{cover_name}")
 
         # Get cover from url
         urlretrieve(f"{self.POSTER_BASE_URL}{cover_path}", f"{self.LOCAL_COVER_PATH}/{cover_name}")
@@ -418,7 +422,7 @@ class ApiAnime(ApiTV):
         genres with the <get_anime_genres> method """
 
         # Api call
-        response = requests.get(f"https://api.jikan.moe/v4/anime?q={anime_name}", timeout=15)
+        response = requests.get(f"https://api.jikan.moe/v4/anime?q={anime_name}", timeout=10)
 
         # Raise for status
         response.raise_for_status()
@@ -430,7 +434,7 @@ class ApiAnime(ApiTV):
 
         anime_genres_list, anime_genres, anime_demographic, anime_themes = [], None, None, None
         try:
-            # Search using jikan API
+            # Search using Jikan API
             anime_search = self.api_anime_search(self.API_data.get("name"))
 
             # Add data
@@ -616,7 +620,6 @@ class ApiGames(ApiData):
     GROUP = MediaType.GAMES
     LOCAL_COVER_PATH = Path(current_app.root_path, "static/covers/games_covers/")
     POSTER_BASE_URL = "https://images.igdb.com/igdb/image/upload/t_1080p/"
-    MAX_RESULTS = 8
 
     def __init__(self, API_id: int = None):
         super().__init__(API_id)
@@ -636,7 +639,9 @@ class ApiGames(ApiData):
         """ Search game using the IGDB API. <page> attribute unused, here for consistency """
 
         # Request body
-        data = f'fields id, name, cover.image_id, first_release_date, storyline; limit 10; search "{query}";'
+        offset = (page - 1) * 10
+        data = (f'fields id, name, cover.image_id, first_release_date, storyline; limit 10; offset {offset}; '
+                f'search "{query}";')
 
         # API call
         response = requests.post("https://api.igdb.com/v4/games", data=data, headers=self.headers, timeout=10)
@@ -645,7 +650,7 @@ class ApiGames(ApiData):
         response.raise_for_status()
 
         # Populate attribute
-        self.API_data = json.loads(response.text)
+        self.API_data = {"results": json.loads(response.text)}
 
     def create_search_results(self) -> Dict:
         """ Get generate search list as dict """
@@ -653,12 +658,7 @@ class ApiGames(ApiData):
         # Check API results
         media_results = []
         if len(self.API_data) > 0:
-            for result in self.API_data:
-
-                # Break if too much results
-                if len(media_results) >= self.MAX_RESULTS:
-                    break
-
+            for result in self.API_data["results"]:
                 media_details = dict(
                     api_id=result.get("id"),
                     name=result.get("name"),
@@ -673,10 +673,11 @@ class ApiGames(ApiData):
                 # Append to media results
                 media_results.append(media_details)
 
+        # TODO: Using magic number here :(
         data = dict(
             items=media_results,
-            total=self.MAX_RESULTS,
-            pages=1,
+            total=500,
+            pages=50,
         )
 
         return data
@@ -900,7 +901,7 @@ class ApiBooks(ApiData):
 
         # API call
         response = requests.get(f"https://www.googleapis.com/books/v1/volumes?q={query}&startIndex={str(page)}",
-                                timeout=15)
+                                timeout=10)
 
         # Raise for status
         response.raise_for_status()

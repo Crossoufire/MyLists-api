@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, abort, current_app
-from MyLists.API_data import ApiTMDB, ApiGames, ApiBooks
+from MyLists.classes.API_data import ApiTMDB, ApiGames, ApiBooks
 from MyLists.api.auth import token_auth
 from MyLists.models.user_models import User
 

@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request, url_for, current_app
-from sqlalchemy import desc
-from MyLists import cache
-from MyLists.API_data import ApiSeries, ApiMovies
+from sqlalchemy import desc, select
+from MyLists import cache, db
+from MyLists.classes.API_data import ApiSeries, ApiMovies
 from MyLists.api.auth import token_auth
 from MyLists.models.user_models import User
 from MyLists.models.utils_models import Ranks, MyListsStats, Frames
@@ -49,7 +49,10 @@ def hall_of_fame():
 
     # Rank users according to <profile_level>
     # noinspection PyTypeChecker
-    ranks = User.query.filter(User.active, User.role != RoleType.ADMIN).order_by(desc(User.profile_level)).all()
+    users_ranked = (db.session.scalars(
+        select(User.username).where(User.active, User.role != RoleType.ADMIN)
+        .order_by(desc(User.profile_level))).all()
+    )
 
     # Query users
     # noinspection PyTypeChecker
@@ -62,12 +65,11 @@ def hall_of_fame():
     all_levels, users_serialized = [], []
     for user in users.items:
         user_dict = user.to_dict()
-        idx = next(i for i, ur in enumerate(ranks) if ur.username == user.username)
+        user_dict["rank"] = users_ranked.index(user.username) + 1
         for model in models_type:
             media_level = get_media_level_and_time(user, model.GROUP.value, only_level=True)
             user_dict[f"{model.GROUP.value}_level"] = media_level
             all_levels.append(media_level)
-        user_dict["rank"] = idx + 1
         users_serialized.append(user_dict)
 
     # Query media levels

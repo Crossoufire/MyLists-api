@@ -1,7 +1,7 @@
 from datetime import datetime
 from flask import current_app
 from MyLists import db
-from MyLists.API_data import ApiData, ApiTV, ApiMovies
+from MyLists.classes.API_data import ApiData, ApiTV, ApiMovies
 from MyLists.models.games_models import Games
 from MyLists.models.movies_models import Movies
 from MyLists.models.tv_models import (Series, Anime, SeriesList, AnimeList, SeriesEpisodesPerSeason,
