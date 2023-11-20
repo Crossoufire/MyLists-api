@@ -1,7 +1,7 @@
 """
 Extension of the Google API for books.
 Allow the fetching of books cover from Google images.
-Taken and then modified (simplified) from: https://github.com/Joeclinton1/google-images-download
+Taken and simplified from: https://github.com/Joeclinton1/google-images-download
 """
 
 import http.client

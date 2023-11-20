@@ -20,6 +20,7 @@ def get_subclasses(cls: Type) -> Union[Type, Any]:
 
     return subclasses
 
+
 def get_class_registry(cls: db.Model) -> Dict:
     """ Dynamically gets class registry of sqlalchemy from specified model """
 
@@ -28,6 +29,7 @@ def get_class_registry(cls: db.Model) -> Dict:
         return cls._sa_registry._class_registry
     except:
         return cls._decl_class_registry
+
 
 def get_models_group(media_type: Enum) -> List[db.Model]:
     """ Get the corresponding SQLAlchemy models from the <GROUP> value """
@@ -41,6 +43,7 @@ def get_models_group(media_type: Enum) -> List[db.Model]:
         except:
             pass
     return models
+
 
 def get_models_type(model_type: str) -> List[db.Model]:
     """ Get the model type (List, Media, User, ...) """
@@ -58,9 +61,11 @@ def get_models_type(model_type: str) -> List[db.Model]:
 
     return models
 
-def get_user_level(total_time: float):
-    """ Function use for the profile level """
+
+def get_level(total_time: float):
+    """ Function that returns the level based on time in [minutes] """
     return (((400 + 80 * total_time) ** 0.5) - 20) / 40
+
 
 def get_media_level_and_time(user: db.Model, media_type: str, only_level: bool = False) -> Union[int, Dict]:
     """ Fetch the time spent in min and level of media for a user """
@@ -72,7 +77,7 @@ def get_media_level_and_time(user: db.Model, media_type: str, only_level: bool =
     time_min = getattr(user, f"time_spent_{media_type}")
 
     # Get <levels> and <level_percent>
-    media_level_tmp = f"{get_user_level(time_min):.2f}"
+    media_level_tmp = f"{get_level(time_min):.2f}"
     media_level = int(media_level_tmp.split(".")[0])
     media_level_percent = int(media_level_tmp.split(".")[1])
 
@@ -85,12 +90,12 @@ def get_media_level_and_time(user: db.Model, media_type: str, only_level: bool =
     data = dict(
         media_level=media_level,
         media_level_percent=media_level_percent,
-        time_min=time_min,
         grade_image=rank.image,
         grade_title=rank.name,
     )
 
     return data
+
 
 def save_picture(form_picture, old_picture: str, profile=True):
     """ Save the account picture either profile or background """
@@ -129,6 +134,7 @@ def save_picture(form_picture, old_picture: str, profile=True):
 
     return picture_fn
 
+
 def change_air_format(date_: str, tv: bool = False, games: bool = False, books: bool = False) -> str:
     """ Change the date format and return a formatted string """
 
@@ -144,6 +150,7 @@ def change_air_format(date_: str, tv: bool = False, games: bool = False, books: 
     except (ValueError, TypeError):
         return "N/A"
 
+
 def safe_div(a, b, percentage=False):
     """ Safe div when necessary + do the percentage """
 
@@ -157,6 +164,7 @@ def safe_div(a, b, percentage=False):
     except:
         return 0
 
+
 def is_latin(original_name: str) -> bool:
     """ Check if the <original_name> is Latin, if so return <True> else <False> """
 
@@ -165,6 +173,7 @@ def is_latin(original_name: str) -> bool:
         return True
     except UnicodeEncodeError:
         return False
+
 
 def clean_html_text(raw_html: str) -> str:
     """ Mostly clean an HTML text (not perfect), for the books synopsis from the Google books API """
@@ -176,6 +185,7 @@ def clean_html_text(raw_html: str) -> str:
         cleantext = "Unknown"
 
     return cleantext
+
 
 def display_time(minutes: int) -> str:
     """ Better display time in the MyLists <Stats> page """

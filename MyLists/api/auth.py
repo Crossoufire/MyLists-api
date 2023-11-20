@@ -2,9 +2,10 @@ from __future__ import annotations
 from http import HTTPStatus
 from typing import Tuple, Dict
 from flask_httpauth import HTTPBasicAuth, HTTPTokenAuth
+from sqlalchemy import select
 from werkzeug.exceptions import Forbidden, Unauthorized
 from werkzeug.local import LocalProxy
-
+from MyLists import db
 
 basic_auth = HTTPBasicAuth()
 token_auth = HTTPTokenAuth()
@@ -15,9 +16,9 @@ current_user = LocalProxy(lambda: token_auth.current_user())
 
 @basic_auth.verify_password
 def verify_password(username: str, password: str) -> User:
-    """ Verify the user's username and password on login and return the user object if successful """
+    """ Verify the user's username and password on login and return the <user> object if successful """
 
-    user = User.query.filter_by(username=username).first()
+    user = db.session.scalar(select(User).where(User.username == username))
 
     if user and user.verify_password(password):
         return user

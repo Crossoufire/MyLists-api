@@ -29,7 +29,6 @@ def _remove_old_series_covers():
             current_app.logger.error(f"Error occurred while deleting this old series cover {image}: {e}")
     current_app.logger.info(f'Total old series old covers deleted: {count}')
 
-
 def _remove_old_anime_covers():
     """ Remove all the anime old covers on disk if they are not present in the database """
 
@@ -51,7 +50,6 @@ def _remove_old_anime_covers():
         except Exception as e:
             current_app.logger.error(f"Error occurred while deleting this old anime cover {image}: {e}")
     current_app.logger.info(f'Total old anime old covers deleted: {count}')
-
 
 def _remove_old_movies_covers():
     """ Remove all the movies old covers on disk if they are not present in the database """
@@ -75,7 +73,6 @@ def _remove_old_movies_covers():
             current_app.logger.error(f"Error occurred while deleting this old movie cover {image}: {e}")
     current_app.logger.info(f'Total old movies old covers deleted: {count}')
 
-
 def _remove_old_books_covers():
     """ Remove all the books old covers on disk if they are not present in the database """
 
@@ -97,7 +94,6 @@ def _remove_old_books_covers():
         except Exception as e:
             current_app.logger.error(f"Error occurred while deleting this old book cover {image}: {e}")
     current_app.logger.info(f'Total old books old covers deleted: {count}')
-
 
 def _remove_old_games_covers():
     """ Remove all the games old covers on disk if they are not present in the database """
