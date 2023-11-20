@@ -7,10 +7,9 @@ from flask_bcrypt import generate_password_hash
 from MyLists import db
 from MyLists.api.auth import token_auth, current_user
 from MyLists.api.email import send_email
-from MyLists.models.user_models import Notifications, User, get_all_media_info, UserLastUpdate
+from MyLists.models.user_models import (Notifications, UserLastUpdate, User)
 from MyLists.utils.enums import RoleType
-from MyLists.utils.utils import save_picture
-
+from MyLists.utils.utils import save_picture, get_models_type
 
 users = Blueprint("api_users", __name__)
 
@@ -84,13 +83,21 @@ def profile(username: str):
         user.profile_views += 1
 
     # Get <user> last updates
-    user_updates = user.get_last_updates(limit_=7)
+    user_updates = user.get_last_updates(limit_=6)
 
-    # Get follows last updates
-    follows_updates = user.get_follows_updates(limit_=11)
+    # Get <follows> last updates
+    follows_updates = user.get_follows_updates(limit_=10)
 
-    # Get each media data and global statistics
-    media_data, media_global = get_all_media_info(user)
+    # Get List Levels of user
+    list_levels = user.get_list_levels()
+
+    # Get summary statistics
+    media_global = user.get_global_media_stats()
+
+    # Get media details
+    list_models = [ml for ml in get_models_type("List") if getattr(user, f"add_{ml.GROUP.value.lower()}", None)
+                   is None or getattr(user, f"add_{ml.GROUP.value.lower()}")]
+    media_data = [user.get_one_media_details(ml.GROUP) for ml in list_models]
 
     # Commit changes
     db.session.commit()
@@ -99,11 +106,12 @@ def profile(username: str):
     data = dict(
         user_data=user.to_dict(),
         user_updates=user_updates,
-        follows=[follow.to_dict() for follow in user.followed.limit(12).all()],
+        follows=[follow.to_dict() for follow in user.followed.limit(8).all()],
         follows_updates=follows_updates,
         is_following=current_user.is_following(user),
-        media_data=media_data,
+        list_levels=list_levels,
         media_global=media_global,
+        media_data=media_data,
     )
 
     return jsonify(data=data)

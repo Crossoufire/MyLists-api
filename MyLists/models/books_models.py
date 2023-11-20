@@ -41,12 +41,17 @@ class Books(MediaMixin, db.Model):
         return [d.name for d in self.authors]
 
     """ --- Methods --------------------------------------------------------------- """
-    def to_dict(self) -> Dict:
+    def to_dict(self, coming_next: bool = False) -> Dict:
         """ Serialization of the books class """
 
         media_dict = {}
         if hasattr(self, "__table__"):
             media_dict = {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
+        if coming_next:
+            media_dict["media_cover"] = self.media_cover
+            media_dict["date"] = change_air_format(self.release_date, books=True)
+            return media_dict
 
         media_dict["media_cover"] = self.media_cover
         media_dict["formated_date"] = change_air_format(self.release_date, books=True)
@@ -240,11 +245,11 @@ class BooksList(MediaListMixin, db.Model):
             .group_by(Books.language).order_by(text("count desc")).limit(5).all()
 
         books_stats = [
-            {"name": "Books per Pages", "values": [tuple(ru) for ru in per_pages]},
-            {"name": "Release dates", "values": [tuple(re) for re in release_dates]},
-            {"name": "Top Authors", "values": [tuple(ta) for ta in top_authors]},
-            {"name": "Top Genres", "values": [tuple(tg) for tg in top_genres]},
-            {"name": "Top Languages", "values": [tuple(tl) for tl in top_languages]},
+            {"name": "Pages", "values": [(page, count_) for page, count_ in per_pages]},
+            {"name": "Releases", "values": [(rel, count_) for rel, count_ in release_dates]},
+            {"name": "Authors", "values": [(author, count_) for author, count_ in top_authors]},
+            {"name": "Genres", "values": [(genre, count_) for genre, count_ in top_genres]},
+            {"name": "Languages", "values": [(lang, count_) for lang, count_ in top_languages]},
         ]
 
         return books_stats
@@ -297,8 +302,6 @@ class BooksGenre(db.Model):
                 "Dystopian", "Essay", "Fantastic", "Fantasy", "History", "Humor", "Horror", "Literary Novel",
                 "Memoirs", "Mystery", "Paranormal", "Philosophy", "Poetry", "Romance", "Science", "Science-Fiction",
                 "Short story", "Suspense", "Testimony", "Thriller", "Western", "Young adult"]
-
-
 
 
 class BooksAuthors(db.Model):

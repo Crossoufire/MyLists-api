@@ -147,17 +147,15 @@ class MediaListMixin:
 
     @classmethod
     def get_media_count_per_metric(cls, user: db.Model) -> List:
-        """ Get the media count per metric (score or feeling) to create a histogram """
+        """ Get the media count per metric (score or feeling) """
 
         # Determine metric (score or feeling) and corresponding range
         metric = cls.feeling if user.add_feeling else cls.score
         range_ = list(range(6)) if user.add_feeling else [i * 0.5 for i in range(21)]
 
         # Query database to get media count per metric for given <user_id>
-        media_count = (db.session.query(metric, func.count(metric))
-                       .filter(cls.user_id == user.id, metric != None)
-                       .group_by(metric).order_by(asc(metric))
-                       .all())
+        media_count = (db.session.query(metric, func.count(metric)).filter(cls.user_id == user.id, metric != None)
+                       .group_by(metric).order_by(asc(metric)).all())
 
         # Create dict to store metric count with default values
         metric_counts = {str(val): 0 for val in range_}
@@ -176,7 +174,7 @@ class MediaListMixin:
         # Determine metric (feeling or score) based on user preferences
         metric = cls.feeling if user.add_feeling else cls.score
 
-        # Query database to calculate media metrics for given user_id
+        # Query to calculate media metrics for given user_id
         media_metrics = db.session.query(func.count(metric), func.count(cls.media_id), func.sum(metric))\
             .filter(cls.user_id == user.id).all()
 
@@ -207,8 +205,7 @@ class MediaListMixin:
     def get_favorites_media(cls, user_id: int, limit: int = 10) -> Dict:
         """ Get the user's favorites media """
 
-        favorites_query = cls.query.filter_by(user_id=user_id, favorite=True) \
-            .order_by(func.random()).all()
+        favorites_query = cls.query.filter_by(user_id=user_id, favorite=True).order_by(func.random()).all()
 
         favorites_list = [{
             "media_name": favorite.media.name,
@@ -216,7 +213,7 @@ class MediaListMixin:
             "media_cover": favorite.media.media_cover
         } for favorite in favorites_query[:limit]]
 
-        return {"favorites": favorites_list, "total_favorites": len(favorites_list)}
+        return {"favorites": favorites_list, "total_favorites": len(favorites_query)}
 
     @classmethod
     def get_available_sorting(cls, is_feeling: bool) -> Dict:

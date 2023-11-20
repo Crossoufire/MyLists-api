@@ -116,7 +116,7 @@ class Games(MediaMixin, db.Model):
         else:
             return abort(400)
 
-        return [q.to_dict() for q in query]
+        return [q.to_dict(coming_next=True) for q in query]
 
     @classmethod
     def remove_games(cls):
@@ -167,15 +167,13 @@ class Games(MediaMixin, db.Model):
 
                 if notif is None:
                     release_date = datetime.utcfromtimestamp(int(info[2])).strftime("%b %d %Y")
-                    payload = {"name": info[3],
-                               "release_date": release_date}
 
                     # noinspection PyArgumentList
                     new_notification = Notifications(
                         user_id=info[1],
                         media_type="movieslist",
                         media_id=info[0],
-                        payload_json=json.dumps(payload)
+                        payload_json=json.dumps({"name": info[3], "release_date": release_date})
                     )
                     db.session.add(new_notification)
 
@@ -286,6 +284,7 @@ class GamesList(MediaListMixin, db.Model):
         media_data = cls.query.filter_by(user_id=user.id).all()
         release_dates = OrderedDict({"'70s": 0, "'80s": 0, "'90s": 0, "'00s": 0, "'10s": 0, "'20s+": 0})
         playtimes = OrderedDict({"<5h": 0, "5-10h": 0, "10-20h": 0, "20-40h": 0, "40-70h": 0, "70-100h": 0, "100h+": 0})
+
         for media in media_data:
             release_date = change_air_format(media.media.release_date, games=True)
             if release_date == "Unknown" or release_date == "N/A":
@@ -322,12 +321,12 @@ class GamesList(MediaListMixin, db.Model):
                 release_dates["'20s+"] += 1
 
         games_stats = [
-            {"name": "Playtimes", "values": [tuple([key, val]) for (key, val) in playtimes.items()]},
-            {"name": "Release dates", "values": [tuple([key, val]) for (key, val) in release_dates.items()]},
-            {"name": "Top Genres", "values": [tuple(ta) for ta in top_genres]},
-            {"name": "Top Platforms", "values": [tuple(tg) for tg in top_platforms]},
-            {"name": "Top Developers", "values": [tuple(tl) for tl in top_dev]},
-            {"name": "Top Perspectives", "values": [tuple(tl) for tl in top_perspectives]},
+            {"name": "Playtimes", "values": [(key, val) for key, val in playtimes.items()]},
+            {"name": "Releases", "values": [(key, val) for key, val in release_dates.items()]},
+            {"name": "Genres", "values": [(genre, count_) for genre, count_ in top_genres]},
+            {"name": "Platforms", "values": [(plat, count_) for plat, count_ in top_platforms]},
+            {"name": "Devs", "values": [(dev, count_) for dev, count_ in top_dev]},
+            {"name": "Perspectives", "values": [(pers, count_) for pers, count_ in top_perspectives]},
         ]
 
         return games_stats

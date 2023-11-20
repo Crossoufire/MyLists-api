@@ -3,7 +3,7 @@ import json
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import List, Dict
-from flask import current_app
+from flask import current_app, abort
 from sqlalchemy import func, text, and_
 from MyLists import db
 from MyLists.api.auth import current_user
@@ -88,11 +88,13 @@ class Movies(MediaMixin, db.Model):
 
         if job == "creator":
             query = cls.query.filter(cls.director_name.ilike(f"%{person}%")).all()
-        else:
+        elif job == "actor":
             actors = MoviesActors.query.filter(MoviesActors.name == person).all()
             query = cls.query.filter(cls.id.in_([p.media_id for p in actors])).all()
+        else:
+            return abort(404)
 
-        return [q.to_dict() for q in query]
+        return [q.to_dict(coming_next=True) for q in query]
 
     @classmethod
     def remove_movies(cls):
@@ -283,12 +285,12 @@ class MoviesList(MediaListMixin, db.Model):
                       .group_by(MoviesGenre.genre).order_by(text("count desc")).limit(10).all())
 
         movies_stats = [
-            {"name": "Runtimes", "values": [tuple(ru) for ru in runtimes]},
-            {"name": "Release dates", "values": [tuple(re) for re in release_dates]},
-            {"name": "Top Actors", "values": [tuple(ta) for ta in top_actors]},
-            {"name": "Top Directors", "values": [tuple(td) for td in top_directors]},
-            {"name": "Top Genres", "values": [tuple(tg) for tg in top_genres]},
-            {"name": "Top Languages", "values": [tuple(tl) for tl in top_languages]},
+            {"name": "Runtimes", "values": [(run, count_) for run, count_ in runtimes]},
+            {"name": "Releases", "values": [(rel, count_) for rel, count_ in release_dates]},
+            {"name": "Actors", "values": [(actor, count_) for actor, count_ in top_actors]},
+            {"name": "Directors", "values": [(director, count_) for director, count_ in top_directors]},
+            {"name": "Genres", "values": [(genre,count_) for genre, count_ in top_genres]},
+            {"name": "Languages", "values": [(lang, count_) for lang, count_ in top_languages]},
         ]
 
         return movies_stats
