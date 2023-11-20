@@ -23,36 +23,6 @@ cache = Cache()
 cors = CORS()
 
 
-class SSL_SMTPHandler(SMTPHandler):
-    """ Create an inherited class of SMTPHandler which handle SSL """
-
-    def emit(self, record):
-        """ Emit a record """
-
-        try:
-            port = self.mailport
-            if not port:
-                port = smtplib.SMTP_PORT
-            smtp = smtplib.SMTP_SSL(self.mailhost, port, timeout=self.timeout)
-
-            # Create message
-            msg = EmailMessage()
-            msg["From"] = self.fromaddr
-            msg["To"] = ",".join(self.toaddrs)
-            msg["Subject"] = self.getSubject(record)
-            msg["Date"] = em.localtime()
-            msg.set_content(self.format(record))
-
-            if self.username:
-                smtp.login(self.username, self.password)
-            smtp.send_message(msg, self.fromaddr, self.toaddrs)
-            smtp.quit()
-        except (KeyboardInterrupt, SystemExit):
-            raise Exception
-        except:
-            self.handleError(record)
-
-
 def _import_blueprints(app: Flask):
     """ Import and register blueprints to the app """
 
@@ -85,23 +55,26 @@ def _create_app_logger(app: Flask):
     handler = RotatingFileHandler(log_file_path, maxBytes=3000000, backupCount=15)
     handler.setFormatter(logging.Formatter("[%(asctime)s] %(levelname)s - %(message)s"))
     handler.setLevel(logging.INFO)
+
     app.logger.setLevel(logging.INFO)
     app.logger.addHandler(handler)
     app.logger.info("MyLists is starting up...")
 
 
 def _create_mail_handler(app: Flask):
-    """ Create a mail handler from the <SSL_SMTPHandler> class """
+    """ Create a mail handler (TSL only, for SSL needs modification) associated with the app logger,
+    which send an email when an error occurs """
 
-    mail_handler = SSL_SMTPHandler(
+    mail_handler = SMTPHandler(
         mailhost=(app.config["MAIL_SERVER"], app.config["MAIL_PORT"]),
         fromaddr=app.config["MAIL_USERNAME"],
         toaddrs=app.config["MAIL_USERNAME"],
         subject="MyLists - Exceptions occurred",
-        credentials=(app.config["MAIL_USERNAME"], app.config["MAIL_PASSWORD"])
+        credentials=(app.config["MAIL_USERNAME"], app.config["MAIL_PASSWORD"]),
+        secure=(),
     )
 
-    # Set logger level to ERROR only
+    # Set logger level to <ERROR> only
     mail_handler.setLevel(logging.ERROR)
     app.logger.addHandler(mail_handler)
 
@@ -176,11 +149,7 @@ def init_app() -> Flask:
     db.init_app(app)
     bcrypt.init_app(app)
     cache.init_app(app)
-    cors.init_app(
-        app,
-        origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:8080", "http://127.0.0.1:8080"],
-        supports_credentials=True,
-    )
+    cors.init_app(app, origins=["http://localhost:3000", "http://127.0.0.1:3000"], supports_credentials=True)
 
     with app.app_context():
         _import_blueprints(app)
