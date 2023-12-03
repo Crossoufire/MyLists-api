@@ -6,13 +6,13 @@ errors = Blueprint("errors_api", __name__)
 
 
 @errors.app_errorhandler(HTTPException)
-def http_error(error):
+def http_error(error, message=None):
     """ Handle all HTTP exceptions (400, 404, 403, etc...) """
 
     data = dict(
         code=error.code,
         message=error.name,
-        description=error.description,
+        description=message if message else error.description,
     )
 
     return data, error.code

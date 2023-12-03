@@ -9,9 +9,11 @@ from urllib.request import urlretrieve, Request
 import requests
 from PIL import Image
 from PIL.Image import Resampling
-from flask import url_for, current_app
+from flask import url_for, current_app, abort
 from howlongtobeatpy import HowLongToBeat
 from ratelimit import sleep_and_retry, limits
+from werkzeug.exceptions import HTTPException
+
 from MyLists import db
 from MyLists.models.books_models import Books, BooksGenre, BooksAuthors
 from MyLists.models.games_models import Games, GamesCompanies, GamesPlatforms, GamesGenre
@@ -194,9 +196,6 @@ class ApiTMDB(ApiData):
     def _save_api_cover(self, cover_path: str, cover_name: str):
         """ Save the media (Series, Anime or Movies) cover to the local server disk """
 
-        print(cover_path, cover_name)
-        print(f"{self.POSTER_BASE_URL}{cover_path}", f"{self.LOCAL_COVER_PATH}/{cover_name}")
-
         # Get cover from url
         urlretrieve(f"{self.POSTER_BASE_URL}{cover_path}", f"{self.LOCAL_COVER_PATH}/{cover_name}")
 
@@ -237,9 +236,16 @@ class ApiTV(ApiTMDB):
     def _get_details_and_credits_data(self):
         """ Get the details and credits for a Series or an Anime from the TMDB API """
 
-        # Make API call
-        url = f"https://api.themoviedb.org/3/tv/{self.API_id}?api_key={self.API_KEY}&append_to_response=credits"
-        self.API_data = requests.get(url, timeout=10).json()
+        # API call
+        response = requests.get(f"https://api.themoviedb.org/3/tv/{self.API_id}?api_key={self.API_KEY}"
+                                f"&append_to_response=credits", timeout=15)
+
+        if not response.ok:
+            resp_json = response.json()
+            return abort(404, resp_json.get("status_message"))
+
+        # Add data to instance attribute
+        self.API_data = json.loads(response.text)
 
     def _from_API_to_dict(self, updating: bool = False):
         """ Fetch the wanted data from the TMDB API to the <all_data> dict """
@@ -545,8 +551,9 @@ class ApiMovies(ApiTMDB):
         response = requests.get(f"https://api.themoviedb.org/3/movie/{self.API_id}?api_key={self.API_KEY}"
                                 f"&append_to_response=credits", timeout=15)
 
-        # Raise for status
-        response.raise_for_status()
+        if not response.ok:
+            resp_json = response.json()
+            return abort(404, resp_json.get("status_message"))
 
         # Add data to instance attribute
         self.API_data = json.loads(response.text)

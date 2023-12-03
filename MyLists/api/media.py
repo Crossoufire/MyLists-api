@@ -56,10 +56,21 @@ def media_details(media_type: MediaType, media_id: int):
 
     media_class, *_ = get_models_group(media_type)
 
-    # Check <media> in database
-    media = media_class.query.filter_by(id=media_id).first()
-    if not media:
-        return abort(404)
+    if request.args.get("search"):
+        media = media_class.query.filter_by(api_id=media_id).first()
+        if not media:
+            API_class = ApiData.get_API_class(media_type)
+            try:
+                media = API_class(API_id=media_id).save_media_to_db()
+                db.session.commit()
+            except Exception as e:
+                current_app.logger.error(f"[ERROR] - trying to add ({media_type.value}) ID [{media_id}] to DB: {e}")
+                return {"message": "Sorry, a problem occurred trying to load the media info. Please try again later."}, 400
+    else:
+        # Check <media> in database
+        media = media_class.query.filter_by(id=media_id).first()
+        if not media:
+            return abort(404)
 
     # Check if <current_user> has <media> in his list
     current_user_data = media.get_user_list_info()
@@ -70,6 +81,7 @@ def media_details(media_type: MediaType, media_id: int):
         user_data=current_user_data,
         media=media.to_dict(),
         follows_data=media.in_follows_lists(),
+        redirect=True if request.args.get("search") else False,
     )
 
     return jsonify(data=data)
@@ -153,28 +165,28 @@ def media_details_form(media_type: MediaType, media_id: int):
     return jsonify(data={"message": "Media data successfully updated."})
 
 
-@media_bp.route("/add_media_to_db/<media_type>/<api_media_id>", methods=["POST"])
-@token_auth.login_required
-@validate_media_type
-def add_media_to_db(media_type: MediaType, api_media_id):
-    """ Add the <media> to the database if it doesn't exist yet and return the database ID """
-
-    media_class, *_ = get_models_group(media_type)
-
-    # Check <media> in local DB
-    media = media_class.query.filter_by(api_id=api_media_id).first()
-
-    # Try to add media from API otherwise
-    if not media:
-        API_class = ApiData.get_API_class(media_type)
-        try:
-            media = API_class(API_id=api_media_id).save_media_to_db()
-            db.session.commit()
-        except Exception as e:
-            current_app.logger.error(f"[ERROR] - trying to add ({media_type.value}) ID [{api_media_id}] to DB: {e}")
-            return {"message": "Sorry, a problem occurred trying to load the media info. Please try again later."}, 400
-
-    return jsonify(media_id=media.id)
+# @media_bp.route("/add_media_to_db/<media_type>/<api_media_id>", methods=["POST"])
+# @token_auth.login_required
+# @validate_media_type
+# def add_media_to_db(media_type: MediaType, api_media_id: int | str):
+#     """ Add the <media> to the database if it doesn't exist yet and return the database ID """
+#
+#     media_class, *_ = get_models_group(media_type)
+#
+#     # Check <media> in local DB
+#     media = media_class.query.filter_by(api_id=api_media_id).first()
+#
+#     # Try to add media from API otherwise
+#     if not media:
+#         API_class = ApiData.get_API_class(media_type)
+#         try:
+#             media = API_class(API_id=api_media_id).save_media_to_db()
+#             db.session.commit()
+#         except Exception as e:
+#             current_app.logger.error(f"[ERROR] - trying to add ({media_type.value}) ID [{api_media_id}] to DB: {e}")
+#             return {"message": "Sorry, a problem occurred trying to load the media info. Please try again later."}, 400
+#
+#     return jsonify(media_id=media.id)
 
 
 @media_bp.route("/refresh/<media_type>/<media_id>", methods=["POST"])

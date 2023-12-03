@@ -137,7 +137,7 @@ class Movies(MediaMixin, db.Model):
                 cls.release_date > datetime.utcnow(),
                 cls.release_date <= datetime.utcnow() + timedelta(days=7),
                 MoviesList.status != Status.PLAN_TO_WATCH,
-            ))).all()
+                ))).all()
 
             for info in query:
                 notif = Notifications.seek(info[1], "movieslist", info[0])
@@ -322,3 +322,74 @@ class MoviesActors(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     media_id = db.Column(db.Integer, db.ForeignKey("movies.id"), nullable=False)
     name = db.Column(db.String(150))
+
+
+# class MoviesSim(db.Model):
+#     """ Movies similarities SQL model """
+#
+#     GROUP = MediaType.MOVIES
+#
+#     id = db.Column(db.Integer, primary_key=True)
+#     media_id = db.Column(db.Integer, db.ForeignKey("movies.id"), nullable=False)
+#     media_id_2 = db.Column(db.Integer, db.ForeignKey("movies.id"), nullable=False)
+#     similarity = db.Column(db.Integer)
+#
+#     @classmethod
+#     def compute_all_similarities(cls):
+#         from sklearn.feature_extraction.text import TfidfVectorizer
+#         from sklearn.metrics.pairwise import cosine_similarity
+#         from sklearn.preprocessing import OneHotEncoder
+#         from sklearn.compose import ColumnTransformer
+#         import pandas as pd
+#         import numpy as np
+#
+#         # Movies with genres
+#         movies_query  = (db.session.query(Movies.id.label("movie_id"), Movies.name, Movies.synopsis,
+#                                           func.group_concat(MoviesGenre.genre).label("genres"))
+#                          .join(MoviesGenre, MoviesGenre.media_id == Movies.id).group_by(Movies.id))
+#
+#         # Transform to Dataframe
+#         df = pd.read_sql(movies_query.statement, db.engine)
+#
+#         # TfidfVectorizer with common parameters for English text
+#         tfidf_vectorizer = TfidfVectorizer(
+#             stop_words="english",
+#             ngram_range=(1, 2),
+#             max_df=0.85,
+#             sublinear_tf=True,
+#             smooth_idf=True,
+#         )
+#
+#         # One-Hot-Encoder and TF-IDF vectorization
+#         preprocessor = ColumnTransformer(
+#             transformers=[
+#                 ("genres", OneHotEncoder(), ["genres"]),
+#                 ("synopsis", tfidf_vectorizer, "synopsis"),
+#             ],
+#         )
+#
+#         # Combine genres encoding and TF-IDF vectorization
+#         concatenated_matrix = preprocessor.fit_transform(df)
+#
+#         # Compute cosine similarity
+#         cosine_sim = cosine_similarity(concatenated_matrix, concatenated_matrix)
+#
+#         # Specific movie ID
+#         query_movie_id = 6560
+#
+#         # Find row index corresponding to given movie ID
+#         movie_index = df[df["movie_id"] == query_movie_id].index[0]
+#
+#         # Get cosine similarities for specified movie
+#         movie_cosine_similarities = cosine_sim[movie_index]
+#
+#         # Find indices of top 12 most similar movies (excluding itself)
+#         most_similar_movie_indices = np.argsort(movie_cosine_similarities)[::-1][1:13]
+#
+#         # Get movie name and cosine similarities of top 12 most similar movies
+#         top_12_movie_names = df.iloc[most_similar_movie_indices]["name"].tolist()
+#         top_12_cosine_similarities = movie_cosine_similarities[most_similar_movie_indices]
+#
+#         # Print top 12 results
+#         for i, (name, similarity) in enumerate(zip(top_12_movie_names, top_12_cosine_similarities), 1):
+#             print(f"{i:02d}. {name} -- Cosine similarity = {similarity:.3f}")

@@ -171,7 +171,7 @@ class Games(MediaMixin, db.Model):
                     # noinspection PyArgumentList
                     new_notification = Notifications(
                         user_id=info[1],
-                        media_type="movieslist",
+                        media_type="gameslist",
                         media_id=info[0],
                         payload_json=json.dumps({"name": info[3], "release_date": release_date})
                     )
