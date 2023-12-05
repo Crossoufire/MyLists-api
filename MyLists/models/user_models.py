@@ -8,7 +8,7 @@ import jwt
 import pytz
 from flask import url_for, current_app, abort
 from flask_bcrypt import check_password_hash
-from sqlalchemy import desc, func, Integer, case, select, asc, or_
+from sqlalchemy import desc, func, Integer, case, select, asc
 from sqlalchemy.ext.hybrid import hybrid_property
 from MyLists import db
 from MyLists.api.auth import current_user
@@ -19,7 +19,7 @@ from MyLists.utils.utils import get_level, get_models_group, change_air_format, 
 followers = db.Table(
     "followers",
     db.Column("follower_id", db.Integer, db.ForeignKey("user.id")),
-    db.Column("followed_id", db.Integer, db.ForeignKey("user.id"))
+    db.Column("followed_id", db.Integer, db.ForeignKey("user.id")),
 )
 
 
@@ -36,7 +36,7 @@ class Token(db.Model):
     refresh_expiration = db.Column(db.DateTime, nullable=False)
 
     # --- Relationships ------------------------------------------------------------
-    user = db.relationship("User", back_populates="token")
+    user = db.relationship("User", backref=db.backref("token", lazy="noload"))
 
     def generate(self):
         """ Generate the <access token> and the <refresh token> for a user """
@@ -111,15 +111,20 @@ class User(db.Model):
     last_seen = db.Column(db.DateTime, default=datetime.utcnow)
 
     # --- Relationships ----------------------------------------------------------------
-    token = db.relationship("Token", back_populates="user", lazy="noload")
     series_list = db.relationship("SeriesList", backref="user", lazy="select")
     anime_list = db.relationship("AnimeList", backref="user", lazy="select")
     movies_list = db.relationship("MoviesList", backref="user", lazy="select")
     games_list = db.relationship("GamesList", backref="user", lazy="select")
     last_updates = db.relationship("UserLastUpdate", backref="user", order_by="desc(UserLastUpdate.date)", lazy="dynamic")
-    followed = db.relationship("User", secondary=followers, primaryjoin=(followers.c.follower_id == id),
-                               secondaryjoin=(followers.c.followed_id == id), order_by="asc(User.username)",
-                               backref=db.backref("followers", lazy="dynamic"), lazy="dynamic")
+    followed = db.relationship(
+        "User",
+        secondary=followers,
+        primaryjoin=(followers.c.follower_id == id),
+        secondaryjoin=(followers.c.followed_id == id),
+        order_by="asc(User.username)",
+        backref=db.backref("followers", lazy="dynamic"),
+        lazy="dynamic"
+    )
 
     @property
     def profile_image(self) -> str:
@@ -135,17 +140,15 @@ class User(db.Model):
     def profile_border(self) -> str:
         """ Get the border of the profile based on the profile level """
 
-        base_path = "img/profile_borders"
         profile_border = "border_40.png"
-
-        profile_border_level = f"{(self.profile_level // 8) + 1:02d}"
-        if profile_border_level < "40":
+        profile_border_level = (self.profile_level // 8) + 1
+        if profile_border_level < 40:
             profile_border = f"border_{profile_border_level}.png"
 
-        return url_for("static", filename=f"{base_path}/{profile_border}")
+        return url_for("static", filename=f"img/profile_borders/{profile_border}")
 
     @property
-    def followers_count(self):
+    def followers_count(self) -> int:
         """ Return the number of followers of the user """
         return self.followers.count()
 
@@ -165,7 +168,7 @@ class User(db.Model):
     # noinspection PyMethodParameters
     @profile_level.expression
     def profile_level(cls) -> int:
-        """ Return the user's profile level as an SQLAlchemy query for the <Hall of Fame> route """
+        """ Return the user's profile level as an SQLAlchemy query for the <Hall of Fame> endpoint """
 
         # Calculate <total_time>
         total_time = cls.time_spent_series + cls.time_spent_movies
@@ -178,9 +181,9 @@ class User(db.Model):
         return profile_level
 
     def to_dict(self) -> Dict:
-        """ Serialize the user class - does not include <email> and <password> """
+        """ Serialize the <user> class. It does not include the <email> and <password> fields """
 
-        excluded_attrs = ["email", "password"]
+        excluded_attrs = ("email", "password")
         user_dict = {c.name: getattr(self, c.name) for c in self.__table__.columns if c.name not in excluded_attrs}
 
         # Additional attributes
@@ -207,10 +210,10 @@ class User(db.Model):
     def revoke_all_tokens(self):
         """ Revoke all the <access token> and <refresh token> of the current user """
 
-        Token.query.filter(Token.user == self).delete()
-
-        # Commit changes
+        db.session.delete(db.select(Token).filter(Token.user == self))
+        # Token.query.filter(Token.user == self).delete()
         db.session.commit()
+        print("it worked")
 
     def generate_auth_token(self) -> Token:
         """ Generate and return an authentication token for the user """
@@ -258,10 +261,10 @@ class User(db.Model):
     def get_last_notifications(self, limit_: int = 8) -> List[Notifications]:
         """ Get the last <limit_> notifications for the current user """
 
-        notif = (Notifications.query.filter_by(user_id=self.id)
-                 .order_by(desc(Notifications.timestamp)).limit(limit_).all())
+        notifications = db.session.scalars(db.select(Notifications).filter_by(user_id=self.id)
+                                           .order_by(desc(Notifications.timestamp)).limit(limit_)).all()
 
-        return notif
+        return notifications
 
     def count_notifications(self) -> int:
         """ Count the number of unread notifications for the current user """
@@ -269,25 +272,25 @@ class User(db.Model):
         return Notifications.query.filter_by(user_id=self.id).filter(Notifications.timestamp > last_notif_time).count()
 
     def get_global_media_stats(self) -> Dict:
-        """ Get the media list global stats """
+        """ Get the global stats based on the media list data """
 
         # Fetch and select <list> models
         list_models = get_models_type("List")
         list_models = [ml for ml in list_models if getattr(self, f"add_{ml.GROUP.value.lower()}", None) is None
                        or getattr(self, f"add_{ml.GROUP.value.lower()}")]
 
-        # Calculate time per media (in hours)
+        # Calculate time per media [hours]
         to_query = [getattr(User, f"time_spent_{ml.GROUP.value}") for ml in list_models]
         time_per_media = [t / 60 for t in db.session.query(*to_query).filter_by(id=self.id).first()]
 
-        # Total time (in hours)
+        # Total time [hours]
         total_hours = sum(time_per_media)
 
         # Combine queries for total media, percent scored, and mean score
         count_per_feeling = []
         if self.add_feeling:
             subqueries = [(db.session.query(ml.feeling, func.count(ml.feeling))
-                           .filter(ml.user_id == self.id, ml.feeling != None).group_by(ml.feeling)
+                           .filter(ml.user_id == self.id, ml.feeling.isnot(None)).group_by(ml.feeling)
                            .order_by(asc(ml.feeling))) for ml in list_models]
 
             results = [db.session.execute(sub).all() for sub in subqueries]
@@ -301,8 +304,8 @@ class User(db.Model):
 
         metric = "feeling" if self.add_feeling else "score"
         subqueries = [(db.session.query(func.count(ml.media_id), func.count(getattr(ml, metric)),
-                                        func.coalesce(func.sum(getattr(ml, metric)), 0))
-                       .filter(ml.user_id == self.id)) for ml in list_models]
+                                        func.coalesce(func.sum(getattr(ml, metric)), 0)).filter(ml.user_id == self.id))
+                      for ml in list_models]
         query = subqueries[0].union_all(*subqueries[1:])
         results = db.session.execute(query).all()
 
@@ -334,7 +337,6 @@ class User(db.Model):
             media_type=media_type.value,
             specific_total=media_list.get_specific_total(self.id),
             count_per_metric=media_list.get_media_count_per_metric(self),
-            # stats=media_list.get_media_stats(self),
             time_hours=int(getattr(self, f"time_spent_{media_type.value}") / 60),
             time_days=int(getattr(self, f"time_spent_{media_type.value}") / 1440),
         )
@@ -405,15 +407,15 @@ class User(db.Model):
     def create_search_results(cls, search: str, page: int = 1) -> Dict:
         """ Create the <users> search results """
 
-        users = (cls.query.filter(cls.username.like(f"%{search}%"), cls.role != RoleType.ADMIN)
-                 .paginate(page=page, per_page=8, error_out=True))
+        users = db.paginate(db.select(cls).filter(cls.username.like(f"%{search}%"), cls.role != RoleType.ADMIN),
+                            page=page, per_page=8, error_out=True)
 
         users_list = [{
             "name": user.username,
             "image_cover": user.profile_image,
             "date": user.registered_on.strftime("%d %b %Y"),
             "media_type": "User",
-            } for user in users.items]
+        } for user in users.items]
 
         return {"items": users_list, "total": users.total, "pages": users.pages}
 
@@ -612,23 +614,20 @@ class Notifications(db.Model):
 
 
 def get_coming_next(media_type: MediaType) -> List[Dict]:
-    """ Fetch the media that are 'coming next' for the current user """
+    """ Fetch the media that are coming next for the current user (<coming_next> endpoint) """
 
     # Get models
     media, media_list, *_ = get_models_group(media_type)
 
-    # Get date attribute
+    # Get <date> column attribute
+    media_date = "release_date"
     if media_type in (MediaType.SERIES, MediaType.ANIME):
         media_date = "next_episode_to_air"
-    else:
-        media_date = "release_date"
 
     if media_type == MediaType.GAMES:
-        subquery = (media.query
-                    .join(media_list, media.id == media_list.media_id)
+        subquery = (media.query.join(media_list, media.id == media_list.media_id)
                     .filter(media_list.user_id == current_user.id, media_list.status != Status.DROPPED)
-                    .order_by(getattr(media, media_date).asc())
-                    .all())
+                    .order_by(getattr(media, media_date).asc()).all())
 
         data = []
         for game in subquery:
@@ -645,63 +644,9 @@ def get_coming_next(media_type: MediaType) -> List[Dict]:
 
         return data
 
-    query = (db.session.query(media)
-             .join(media_list, media.id == media_list.media_id)
-             .filter(getattr(media, media_date) > datetime.utcnow())
-             .filter(media_list.user_id == current_user.id)
+    query = (db.session.query(media).join(media_list, media.id == media_list.media_id)
+             .filter(getattr(media, media_date) > datetime.utcnow()).filter(media_list.user_id == current_user.id)
              .filter(media_list.status.notin_([Status.DROPPED, Status.RANDOM]))
-             .order_by(getattr(media, media_date).asc())
-             .all())
+             .order_by(getattr(media, media_date).asc()).all())
 
     return [q.to_dict(coming_next=True) for q in query]
-
-
-# def get_all_media_info(user: User) -> Tuple[List, Dict]:
-#     """ Get all the media data and the global stats for a user "/profile" route """
-#
-#     # Fetch all "list" models
-#     list_models = get_models_type("List")
-#
-#     # Remove media not used by <user>
-#     if not user.add_anime:
-#         list_models.remove(AnimeList)
-#     if not user.add_books:
-#         list_models.remove(BooksList)
-#     if not user.add_games:
-#         list_models.remove(GamesList)
-#
-#     # Fetch all data for each media in <media_type>
-#     media_data, to_divide  = [], len(list_models)
-#
-#     for model in list_models:
-#         media_dict = dict(
-#             media_type=model.GROUP.value,
-#             media_name=model.GROUP.value.capitalize(),
-#             specific_total=model.get_specific_total(user.id),
-#             media_color=model.DEFAULT_COLOR,
-#             count_per_metric=model.get_media_count_per_metric(user),
-#         )
-#         media_dict.update(get_media_level_and_time(user, model.GROUP.value))
-#         media_dict.update(model.get_media_count_per_status(user.id))
-#         media_dict.update(model.get_favorites_media(user.id, limit=10))
-#         media_dict.update(model.get_media_metric(user))
-#         media_dict["time_hours"] = round(media_dict["time_min"]/60)
-#         media_dict["time_days"] = round(media_dict["time_min"]/1440, 2)
-#
-#         if media_dict["time_min"] == 0:
-#             to_divide -= 1
-#
-#         media_data.append(media_dict)
-#
-#     # Get global media data from each <media_dict>
-#     media_global = dict(
-#         total_hours=sum([x["time_hours"] for x in media_data]),
-#         total_media=sum([x["total_media"] for x in media_data]),
-#         chart_data=[x["time_hours"] for x in media_data],
-#         chart_colors=[x["media_color"] for x in media_data],
-#         total_media_scored=sum([x["media_metric"] for x in media_data]),
-#         total_mean_score=safe_div(sum([x["mean_metric"] for x in media_data]), to_divide),
-#         list_all_metric=[sum(val) for val in zip(*[media["count_per_metric"] for media in media_data])]
-#     )
-#
-#     return media_data, media_global

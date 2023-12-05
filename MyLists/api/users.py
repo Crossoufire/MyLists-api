@@ -312,20 +312,17 @@ def notifications():
     # Commit changes
     db.session.commit()
 
-    # Get current user notifications
+    # Get current user last notifications
     notifs = current_user.get_last_notifications(limit_=8)
 
-    results = []
-    if notifs:
-        for notif in notifs:
-            results.append({
-                "media_type": notif.media_type,
-                "media_id": notif.media_id,
-                "timestamp": notif.timestamp.replace(tzinfo=pytz.UTC).isoformat(),
-                "payload": json.loads(notif.payload_json),
-            })
+    results = [{
+        "media_id": notif.media_id,
+        "media_type": notif.media_type,
+        "timestamp": notif.timestamp.replace(tzinfo=pytz.UTC).isoformat(),
+        "payload": json.loads(notif.payload_json),
+    } for notif in notifs]
 
-    return jsonify(data=results), 200
+    return jsonify(data=results)
 
 
 @users.route("/notifications/count", methods=["GET"])

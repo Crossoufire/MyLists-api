@@ -277,7 +277,6 @@ class SeriesList(MediaListMixin, db.Model):
         DROPPED = "Dropped"
         PLAN_TO_WATCH = "Plan to Watch"
 
-    """ --- Methods --------------------------------------------------------------- """
     def to_dict(self) -> Dict:
         """ Serialization of the serieslist class """
 
@@ -310,51 +309,49 @@ class SeriesList(MediaListMixin, db.Model):
         old_time = current_user.time_spent_series
         current_user.time_spent_series = old_time + ((new_value - old_value) * self.media.duration)
 
-    """ --- Class methods --------------------------------------------------------- """
     @classmethod
     def get_media_stats(cls, user: User) -> List[Dict]:
         """ Compute and return the series stats for the selected user """
 
-        subquery = db.session.query(cls.media_id) \
-            .filter(cls.user_id == user.id, cls.status != Status.PLAN_TO_WATCH).subquery()
+        subquery = (db.session.query(cls.media_id)
+                    .filter(cls.user_id == user.id, cls.status != Status.PLAN_TO_WATCH).subquery())
+
+        episodes = (db.session.query(((Series.total_episodes // 100) * 100).label("bin"),
+                                     func.count(Series.id).label("count"))
+                    .join(subquery, (Series.id == subquery.c.media_id) & (Series.total_episodes != 0))
+                    .group_by("bin").order_by("bin").all())
 
         release_dates = (db.session.query((((extract("year", Series.first_air_date)) // 5) * 5).label("bin"),
-                                         count(Series.first_air_date))
+                                          func.count(Series.first_air_date))
                          .join(subquery, (Series.id == subquery.c.media_id) & (Series.first_air_date != "Unknown"))
                          .group_by(text("bin")).order_by(Series.first_air_date.asc()).all())
-
-        top_networks = (db.session.query(SeriesNetwork.network, func.count(SeriesNetwork.network).label("count"))
-                        .join(subquery, (SeriesNetwork.media_id == subquery.c.media_id) & (SeriesNetwork.network != "Unknown"))
-                        .group_by(SeriesNetwork.network).order_by(text("count desc")).limit(10).all())
-
-        top_genres = (db.session.query(SeriesGenre.genre, func.count(SeriesGenre.genre).label("count"))
-                      .join(subquery, (SeriesGenre.media_id == subquery.c.media_id) & (SeriesGenre.genre != "Unknown"))
-                      .group_by(SeriesGenre.genre).order_by(text("count desc")).limit(10).all())
 
         top_actors = (db.session.query(SeriesActors.name, func.count(SeriesActors.name).label("count"))
                       .join(subquery, (SeriesActors.media_id == subquery.c.media_id) & (SeriesActors.name != "Unknown"))
                       .group_by(SeriesActors.name).order_by(text("count desc")).limit(10).all())
 
+        top_genres = (db.session.query(SeriesGenre.genre, func.count(SeriesGenre.genre).label("count"))
+                      .join(subquery, (SeriesGenre.media_id == subquery.c.media_id) & (SeriesGenre.genre != "Unknown"))
+                      .group_by(SeriesGenre.genre).order_by(text("count desc")).limit(10).all())
+
+        top_networks = (db.session.query(SeriesNetwork.network, func.count(SeriesNetwork.network).label("count"))
+                        .join(subquery, (SeriesNetwork.media_id == subquery.c.media_id) & (SeriesNetwork.network != "Unknown"))
+                        .group_by(SeriesNetwork.network).order_by(text("count desc")).limit(10).all())
+
         top_countries = (db.session.query(Series.origin_country, func.count(Series.origin_country).label("count"))
                          .join(subquery, (Series.id == subquery.c.media_id) & (Series.origin_country != "Unknown"))
-                         .group_by(Series.origin_country).order_by(text("count desc")).all())
+                         .group_by(Series.origin_country).order_by(text("count desc")).limit(10).all())
 
-        episodes = (db.session.query(((Series.total_episodes // 100 ) * 100).label("bin"), func.count(Series.id).label("count"))
-                    .join(subquery, (Series.id == subquery.c.media_id) & (Series.total_episodes != 0))
-                    .group_by("bin").order_by("bin").all())
-
-        series_stats = [
-            {"name": "Episodes", "values": [(f"{eps} - {eps + 99}", count_) for eps, count_ in episodes]},
-            {"name": "Releases", "values": [(f"{year} - {year + 4}", count_) for year, count_ in release_dates]},
+        stats = [
+            {"name": "Episodes", "values": [(eps, count_) for eps, count_ in episodes]},
+            {"name": "Releases date", "values": [(year, count_) for year, count_ in release_dates]},
             {"name": "Actors", "values": [(actor, count_) for actor, count_ in top_actors]},
             {"name": "Genres", "values": [(genre, count_) for genre, count_ in top_genres]},
             {"name": "Networks", "values": [(network, count_) for network, count_ in top_networks]},
             {"name": "Countries", "values": [(country, count_) for country, count_ in top_countries]},
         ]
 
-        return series_stats
-
-    """ --- Static methods -------------------------------------------------------- """
+        return stats
 
 
 class SeriesGenre(db.Model):
@@ -539,7 +536,6 @@ class AnimeList(MediaListMixin, db.Model):
         DROPPED = "Dropped"
         PLAN_TO_WATCH = "Plan to Watch"
 
-    """ --- Methods --------------------------------------------------------------- """
     def to_dict(self) -> Dict:
         """ Serialization of the animelist class """
 
@@ -572,45 +568,43 @@ class AnimeList(MediaListMixin, db.Model):
         old_time = current_user.time_spent_anime
         current_user.time_spent_anime = old_time + ((new_value - old_value) * self.media.duration)
 
-    """ --- Class methods --------------------------------------------------------- """
     @classmethod
     def get_media_stats(cls, user: User) -> List[Dict]:
         """ Compute and return the anime stats for the selected user """
 
-        subquery = db.session.query(cls.media_id) \
-            .filter(cls.user_id == user.id, cls.status != Status.PLAN_TO_WATCH).subquery()
+        subquery = (db.session.query(cls.media_id)
+                    .filter(cls.user_id == user.id, cls.status != Status.PLAN_TO_WATCH).subquery())
 
-        release_dates = db.session.query((((extract("year", Anime.first_air_date))//10)*10).label("decade"),
-                                         count(Anime.first_air_date)) \
-            .join(subquery, (Anime.id == subquery.c.media_id) & (Anime.first_air_date != "Unknown")) \
-            .group_by(text("decade")).order_by(Anime.first_air_date.asc()).all()
+        episodes = (db.session.query(((Anime.total_episodes // 50 ) * 50).label("bin"), func.count(Anime.id).label("count"))
+                    .join(subquery, (Anime.id == subquery.c.media_id) & (Anime.total_episodes != 0))
+                    .group_by("bin").order_by("bin").all())
 
-        top_networks = db.session.query(AnimeNetwork.network, func.count(AnimeNetwork.network).label("count")) \
-            .join(subquery, (AnimeNetwork.media_id == subquery.c.media_id) & (AnimeNetwork.network != "Unknown")) \
-            .group_by(AnimeNetwork.network).order_by(text("count desc")).limit(10).all()
+        release_dates = (db.session.query((((extract("year", Anime.first_air_date)) // 10) * 10).label("decade"),
+                                          count(Anime.first_air_date))
+                         .join(subquery, (Anime.id == subquery.c.media_id) & (Anime.first_air_date != "Unknown"))
+                         .group_by(text("decade")).order_by(Anime.first_air_date.asc()).all())
 
-        top_genres = db.session.query(AnimeGenre.genre, func.count(AnimeGenre.genre).label("count")) \
-            .join(subquery, (AnimeGenre.media_id == subquery.c.media_id) & (AnimeGenre.genre != "Unknown")) \
-            .group_by(AnimeGenre.genre).order_by(text("count desc")).limit(10).all()
+        top_networks = (db.session.query(AnimeNetwork.network, func.count(AnimeNetwork.network).label("count"))
+                        .join(subquery, (AnimeNetwork.media_id == subquery.c.media_id) & (AnimeNetwork.network != "Unknown"))
+                        .group_by(AnimeNetwork.network).order_by(text("count desc")).limit(10).all())
 
-        top_actors = db.session.query(AnimeActors.name, func.count(AnimeActors.name).label("count")) \
-            .join(subquery, (AnimeActors.media_id == subquery.c.media_id) & (AnimeActors.name != "Unknown")) \
-            .group_by(AnimeActors.name).order_by(text("count desc")).limit(10).all()
+        top_genres = (db.session.query(AnimeGenre.genre, func.count(AnimeGenre.genre).label("count"))
+                      .join(subquery, (AnimeGenre.media_id == subquery.c.media_id) & (AnimeGenre.genre != "Unknown"))
+                      .group_by(AnimeGenre.genre).order_by(text("count desc")).limit(10).all())
 
-        episodes = db.session.query(((Anime.total_episodes // 50 ) * 50).label("bin"),
-                                    func.count(Anime.id).label("count")) \
-            .join(subquery, (Anime.id == subquery.c.media_id) & (Anime.total_episodes != 0)) \
-            .group_by("bin").order_by("bin").all()
+        top_actors = (db.session.query(AnimeActors.name, func.count(AnimeActors.name).label("count"))
+                      .join(subquery, (AnimeActors.media_id == subquery.c.media_id) & (AnimeActors.name != "Unknown"))
+                      .group_by(AnimeActors.name).order_by(text("count desc")).limit(10).all())
 
-        series_stats = [
+        stats = [
             {"name": "Episodes", "values": [(eps, count_) for eps, count_ in episodes]},
-            {"name": "Releases", "values": [(release, count_) for release, count_ in release_dates]},
+            {"name": "Releases date", "values": [(release, count_) for release, count_ in release_dates]},
             {"name": "Actors", "values": [(actor, count_) for actor, count_ in top_actors]},
             {"name": "Genres", "values": [(genre, count_) for genre, count_ in top_genres]},
             {"name": "Networks", "values": [(network, count_) for network, count_ in top_networks]},
         ]
 
-        return series_stats
+        return stats
 
 
 class AnimeGenre(db.Model):

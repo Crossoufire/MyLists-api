@@ -221,38 +221,38 @@ class BooksList(MediaListMixin, db.Model):
     def get_media_stats(cls, user: User) -> List[Dict]:
         """ Get the selected user books stats """
 
-        subquery = db.session.query(cls.media_id) \
-            .filter(cls.user_id == user.id, cls.status != Status.PLAN_TO_READ).subquery()
+        subquery = (db.session.query(cls.media_id)
+                    .filter(cls.user_id == user.id, cls.status != Status.PLAN_TO_READ).subquery())
 
-        per_pages = db.session.query(((Books.pages//100)*100).label("bin"), func.count(Books.id).label("count")) \
-            .join(subquery, (Books.id == subquery.c.media_id) & (Books.pages != 0)) \
-            .group_by("bin").order_by("bin").all()
+        per_pages = (db.session.query(((Books.pages // 100) * 100).label("bin"), func.count(Books.id).label("count"))
+                     .join(subquery, (Books.id == subquery.c.media_id) & (Books.pages != 0))
+                     .group_by("bin").order_by("bin").all())
 
-        release_dates = db.session.query(((Books.release_date//10)*10).label("decade"), func.count(Books.release_date)) \
-            .join(subquery, (Books.id == subquery.c.media_id) & (Books.release_date != "Unknown")) \
-            .group_by("decade").order_by(Books.release_date.asc()).all()
+        release_dates = (db.session.query(((Books.release_date // 10) * 10).label("decade"), func.count(Books.release_date))
+                         .join(subquery, (Books.id == subquery.c.media_id) & (Books.release_date != "Unknown"))
+                         .group_by("decade").order_by(Books.release_date.asc()).all())
 
-        top_genres = db.session.query(BooksGenre.genre, func.count(BooksGenre.genre).label("count")) \
-            .join(subquery, (BooksGenre.media_id == subquery.c.media_id) & (BooksGenre.genre != "Unknown")) \
-            .group_by(BooksGenre.genre).order_by(text("count desc")).limit(10).all()
+        top_genres = (db.session.query(BooksGenre.genre, func.count(BooksGenre.genre).label("count"))
+                      .join(subquery, (BooksGenre.media_id == subquery.c.media_id) & (BooksGenre.genre != "Unknown"))
+                      .group_by(BooksGenre.genre).order_by(text("count desc")).limit(10).all())
 
-        top_authors = db.session.query(BooksAuthors.name, func.count(BooksAuthors.name).label('count')) \
-            .join(subquery, (BooksAuthors.media_id == subquery.c.media_id) & (BooksAuthors.name != "Unknown")) \
-            .group_by(BooksAuthors.name).order_by(text("count desc")).limit(10).all()
+        top_authors = (db.session.query(BooksAuthors.name, func.count(BooksAuthors.name).label("count"))
+                       .join(subquery, (BooksAuthors.media_id == subquery.c.media_id) & (BooksAuthors.name != "Unknown"))
+                       .group_by(BooksAuthors.name).order_by(text("count desc")).limit(10).all())
 
-        top_languages = db.session.query(Books.language, func.count(Books.language).label('count')) \
-            .join(subquery, (Books.id == subquery.c.media_id) & (Books.language != "Unknown")) \
-            .group_by(Books.language).order_by(text("count desc")).limit(5).all()
+        top_languages = (db.session.query(Books.language, func.count(Books.language).label("count"))
+                         .join(subquery, (Books.id == subquery.c.media_id) & (Books.language != "Unknown"))
+                         .group_by(Books.language).order_by(text("count desc")).limit(10).all())
 
-        books_stats = [
+        stats = [
             {"name": "Pages", "values": [(page, count_) for page, count_ in per_pages]},
-            {"name": "Releases", "values": [(rel, count_) for rel, count_ in release_dates]},
+            {"name": "Releases date", "values": [(rel, count_) for rel, count_ in release_dates]},
             {"name": "Authors", "values": [(author, count_) for author, count_ in top_authors]},
             {"name": "Genres", "values": [(genre, count_) for genre, count_ in top_genres]},
             {"name": "Languages", "values": [(lang, count_) for lang, count_ in top_languages]},
         ]
 
-        return books_stats
+        return stats
 
 
     @classmethod

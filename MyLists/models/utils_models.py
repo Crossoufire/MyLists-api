@@ -64,19 +64,18 @@ class MediaMixin:
         _, media_list, *_ = get_models_group(self.GROUP)
 
         # Create query
-        in_follows_lists = db.session.query(User, media_list, followers) \
-            .join(User, User.id == followers.c.followed_id) \
-            .join(media_list, media_list.user_id == followers.c.followed_id) \
+        in_follows_lists = (
+            db.session.query(User, media_list, followers).join(User, User.id == followers.c.followed_id)
+            .join(media_list, media_list.user_id == followers.c.followed_id)
             .filter(followers.c.follower_id == current_user.id, media_list.media_id == self.id).all()
+        )
 
-        to_return = []
-        for follow in in_follows_lists:
-            to_return.append({
-                "username": follow[0].username,
-                "profile_image": follow[0].profile_image,
-                "add_feeling": follow[0].add_feeling,
-                **follow[1].to_dict(),
-            })
+        to_return = [{
+            "username": follow[0].username,
+            "profile_image": follow[0].profile_image,
+            "add_feeling": follow[0].add_feeling,
+            **follow[1].to_dict(),
+        } for follow in in_follows_lists]
 
         return to_return
 

@@ -256,8 +256,12 @@ class MoviesList(MediaListMixin, db.Model):
     def get_media_stats(cls, user: User) -> List[Dict]:
         """ Get the movies stats for a user and return a list of dict """
 
-        subquery = (db.session.query(cls.media_id).filter(cls.user_id == user.id, cls.status != Status.PLAN_TO_WATCH)
-                    .subquery())
+        subquery = (db.session.query(cls.media_id)
+                    .filter(cls.user_id == user.id, cls.status != Status.PLAN_TO_WATCH).subquery())
+
+        runtimes = (db.session.query(((Movies.duration // 30) * 30).label("bin"), func.count(Movies.id).label("count"))
+                    .join(subquery, (Movies.id == subquery.c.media_id) & (Movies.duration != "Unknown"))
+                    .group_by("bin").order_by("bin").all())
 
         release_dates = (db.session.query((((func.extract("year", Movies.release_date)) // 10) * 10).label("decade"),
                                           func.count(Movies.release_date))
@@ -268,14 +272,6 @@ class MoviesList(MediaListMixin, db.Model):
                          .join(subquery, (Movies.id == subquery.c.media_id) & (Movies.director_name != "Unknown"))
                          .group_by(Movies.director_name).order_by(text("count desc")).limit(10).all())
 
-        top_languages = (db.session.query(Movies.original_language, func.count(Movies.original_language).label("nb"))
-                         .join(subquery, (Movies.id == subquery.c.media_id) & (Movies.original_language != "Unknown"))
-                         .group_by(Movies.original_language).order_by(text("nb desc")).limit(5).all())
-
-        runtimes = (db.session.query(((Movies.duration//30)*30).label("bin"), func.count(Movies.id).label("count"))
-                    .join(subquery, (Movies.id == subquery.c.media_id) & (Movies.duration != "Unknown"))
-                    .group_by("bin").order_by("bin").all())
-
         top_actors = (db.session.query(MoviesActors.name, func.count(MoviesActors.name).label("count"))
                       .join(subquery, (MoviesActors.media_id == subquery.c.media_id) & (MoviesActors.name != "Unknown"))
                       .group_by(MoviesActors.name).order_by(text("count desc")).limit(10).all())
@@ -284,16 +280,20 @@ class MoviesList(MediaListMixin, db.Model):
                       .join(subquery, (MoviesGenre.media_id == subquery.c.media_id) & (MoviesGenre.genre != "Unknown"))
                       .group_by(MoviesGenre.genre).order_by(text("count desc")).limit(10).all())
 
-        movies_stats = [
+        top_languages = (db.session.query(Movies.original_language, func.count(Movies.original_language).label("nb"))
+                         .join(subquery, (Movies.id == subquery.c.media_id) & (Movies.original_language != "Unknown"))
+                         .group_by(Movies.original_language).order_by(text("nb desc")).limit(10).all())
+
+        stats = [
             {"name": "Runtimes", "values": [(run, count_) for run, count_ in runtimes]},
-            {"name": "Releases", "values": [(rel, count_) for rel, count_ in release_dates]},
-            {"name": "Actors", "values": [(actor, count_) for actor, count_ in top_actors]},
+            {"name": "Releases date", "values": [(rel, count_) for rel, count_ in release_dates]},
             {"name": "Directors", "values": [(director, count_) for director, count_ in top_directors]},
+            {"name": "Actors", "values": [(actor, count_) for actor, count_ in top_actors]},
             {"name": "Genres", "values": [(genre,count_) for genre, count_ in top_genres]},
             {"name": "Languages", "values": [(lang, count_) for lang, count_ in top_languages]},
         ]
 
-        return movies_stats
+        return stats
 
 
 class MoviesGenre(db.Model):

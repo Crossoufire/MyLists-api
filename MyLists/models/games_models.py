@@ -1,6 +1,5 @@
 from __future__ import annotations
 import json
-from collections import OrderedDict
 from datetime import datetime
 from enum import Enum
 from typing import Dict, List
@@ -155,10 +154,10 @@ class Games(MediaMixin, db.Model):
         try:
             raw_sql = text(""" SELECT games.id, games_list.user_id, games.release_date, games.name 
             FROM games JOIN games_list ON games.id = games_list.media_id
-            WHERE datetime(games.release_date, "unixepoch") IS NOT NULL 
-            AND datetime(games.release_date, "unixepoch") > datetime("now")
-            AND datetime(games.release_date, "unixepoch") <= datetime("now", "+7 days") 
-            AND games_list.status != "PLAN TO PLAY"; """)
+            WHERE datetime(games.release_date, 'unixepoch') IS NOT NULL 
+            AND datetime(games.release_date, 'unixepoch') > datetime('now')
+            AND datetime(games.release_date, 'unixepoch') <= datetime('now', '+7 days') 
+            AND games_list.status != 'PLAN TO PLAY'; """)
 
             query = db.session.execute(raw_sql).all()
 
@@ -261,8 +260,23 @@ class GamesList(MediaListMixin, db.Model):
     def get_media_stats(cls, user: User) -> List[Dict]:
         """ Get more stats associated with games """
 
-        subquery = (db.session.query(cls.media_id).filter(cls.user_id == user.id, cls.status != Status.PLAN_TO_PLAY)
-                    .subquery())
+        subquery = (db.session.query(cls.media_id)
+                    .filter(cls.user_id == user.id, cls.status != Status.PLAN_TO_PLAY).subquery())
+
+        playtime = db.session.scalars(db.select(cls.playtime)
+                                      .filter(cls.user_id == user.id, cls.status != Status.PLAN_TO_PLAY)).all()
+        playtime_bins = [0, 300, 600, 1200, 2400, 4200, 6000, 30000, 60000, 600000]
+        binning = [sum(1 for play in playtime if playtime_bins[i] <= play < playtime_bins[i + 1]) for i in
+                   range(len(playtime_bins) - 1)]
+
+        release_dates = (db.session.query(((func.strftime('%Y', func.datetime(Games.release_date, 'unixepoch')) // 5) * 5).label("release"),
+                                          func.count().label("count"))
+                         .join(subquery, (Games.id == subquery.c.media_id) & (Games.release_date.isnot(None)))
+                         .group_by("release").order_by("release").all())
+
+        top_genres = (db.session.query(GamesGenre.genre, func.count(GamesGenre.genre).label("count"))
+                      .join(subquery, (GamesGenre.media_id == subquery.c.media_id) & (GamesGenre.genre != "Unknown"))
+                      .group_by(GamesGenre.genre).order_by(text("count desc")).limit(10).all())
 
         top_dev = (db.session.query(GamesCompanies.name, func.count(GamesCompanies.name).label("count"))
                    .join(subquery, (GamesCompanies.media_id == subquery.c.media_id) & (GamesCompanies.name != "Unknown")
@@ -273,63 +287,20 @@ class GamesList(MediaListMixin, db.Model):
                          .join(subquery, (GamesPlatforms.media_id == subquery.c.media_id) & (GamesPlatforms.name != "Unknown"))
                          .group_by(GamesPlatforms.name).order_by(text("count desc")).limit(10).all())
 
-        top_genres = (db.session.query(GamesGenre.genre, func.count(GamesGenre.genre).label("count"))
-                      .join(subquery, (GamesGenre.media_id == subquery.c.media_id) & (GamesGenre.genre != "Unknown"))
-                      .group_by(GamesGenre.genre).order_by(text("count desc")).limit(10).all())
-
         top_perspectives = (db.session.query(Games.player_perspective, func.count(Games.player_perspective).label("count"))
                             .join(subquery, (Games.id == subquery.c.media_id) & (Games.player_perspective != "Unknown"))
                             .group_by(Games.player_perspective).order_by(text("count desc")).limit(5).all())
 
-        media_data = cls.query.filter_by(user_id=user.id).all()
-        release_dates = OrderedDict({"'70s": 0, "'80s": 0, "'90s": 0, "'00s": 0, "'10s": 0, "'20s+": 0})
-        playtimes = OrderedDict({"<5h": 0, "5-10h": 0, "10-20h": 0, "20-40h": 0, "40-70h": 0, "70-100h": 0, "100h+": 0})
-
-        for media in media_data:
-            release_date = change_air_format(media.media.release_date, games=True)
-            if release_date == "Unknown" or release_date == "N/A":
-                continue
-            else:
-                release_date = int(release_date.split(" ")[-1])
-
-            if media.playtime < 300:
-                playtimes["<5h"] += 1
-            elif 300 <= media.playtime < 600:
-                playtimes["5-10h"] += 1
-            elif 600 <= media.playtime < 1200:
-                playtimes["10-20h"] += 1
-            elif 1200 <= media.playtime < 2400:
-                playtimes["20-40h"] += 1
-            elif 2400 <= media.playtime < 4200:
-                playtimes["40-70h"] += 1
-            elif 4200 <= media.playtime < 6000:
-                playtimes["70-100h"] += 1
-            elif media.playtime >= 6000:
-                playtimes["100h+"] += 1
-
-            if 1970 <= release_date < 1980:
-                release_dates["'70s"] += 1
-            elif 1980 <= release_date < 1990:
-                release_dates["'80s"] += 1
-            elif 1990 <= release_date < 2000:
-                release_dates["'90s"] += 1
-            elif 2000 <= release_date < 2010:
-                release_dates["'00s"] += 1
-            elif 2010 <= release_date < 2020:
-                release_dates["'10s"] += 1
-            elif 2020 <= release_date:
-                release_dates["'20s+"] += 1
-
-        games_stats = [
-            {"name": "Playtimes", "values": [(key, val) for key, val in playtimes.items()]},
-            {"name": "Releases", "values": [(key, val) for key, val in release_dates.items()]},
+        stats = [
+            {"name": "Playtime", "values": list(zip(playtime_bins[:-1], binning))},
+            {"name": "Releases date", "values": [(release, count_) for release, count_ in release_dates]},
             {"name": "Genres", "values": [(genre, count_) for genre, count_ in top_genres]},
+            {"name": "Developers", "values": [(dev, count_) for dev, count_ in top_dev]},
             {"name": "Platforms", "values": [(plat, count_) for plat, count_ in top_platforms]},
-            {"name": "Devs", "values": [(dev, count_) for dev, count_ in top_dev]},
             {"name": "Perspectives", "values": [(pers, count_) for pers, count_ in top_perspectives]},
         ]
 
-        return games_stats
+        return stats
 
     """ --- Static methods -------------------------------------------------------- """
     @staticmethod

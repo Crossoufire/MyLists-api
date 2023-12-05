@@ -1,8 +1,5 @@
-import email.utils as em
 import logging
 import os
-import smtplib
-from email.message import EmailMessage
 from logging.handlers import SMTPHandler, RotatingFileHandler
 from flask import Flask
 from flask_bcrypt import Bcrypt

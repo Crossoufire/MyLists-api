@@ -17,7 +17,7 @@ def autocomplete():
 
     if selector == "users":
         try:
-            results = User.create_search_results(search)
+            results = User.create_search_results(search, page=page)
         except Exception as e:
             current_app.logger.error(f"[ERROR] - Requesting my DB: {e}")
             return abort(400)
