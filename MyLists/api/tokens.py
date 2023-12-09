@@ -21,9 +21,9 @@ def token_response(token: Token) -> Tuple[Dict, int, Dict]:
             key="refresh_token",
             value=token.refresh_token,
             path=url_for("api_tokens.new_token"),
-            secure=True,
+            secure=not current_app.debug,
             httponly=True,
-            samesite="none",
+            samesite="none" if not current_app.debug else "lax",
         )
     }
 
