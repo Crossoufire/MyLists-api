@@ -21,10 +21,10 @@ def token_response(token: Token) -> Tuple[Dict, int, Dict]:
             key="refresh_token",
             value=token.refresh_token,
             path=url_for("api_tokens.new_token"),
-            secure=not current_app.debug,
+            secure=True,
             httponly=True,
-            samesite="none" if not current_app.debug else "lax",
-        )
+            samesite="none",
+        ),
     }
 
     return {"access_token": token.access_token}, 200, headers

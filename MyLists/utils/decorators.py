@@ -25,16 +25,19 @@ def media_endpoint_decorator(type_: Any = None):
     """ Add endpoint type before creating decorator """
 
     def decorator(func: Callable):
-        """ decorator that pre-check json data before accessing the route """
+        """ Decorator that pre-check json data before accessing the route """
         @wraps(func)
         def wrapper():
             try:
+                # Parse JSON data
                 json_data = request.get_json()
                 media_id = int(json_data["media_id"])
                 media_type = json_data["media_type"]
+
+                # Handle payload with optional type conversion
                 payload = type_(json_data["payload"]) if type_ else json_data.get("payload", None) or None
             except:
-                return abort(400)
+                return abort(400, "Invalid input. It must be an number.")
 
             # Check if <media_type> valid
             try:

@@ -34,6 +34,8 @@ class Token(db.Model):
     access_expiration = db.Column(db.DateTime, nullable=False)
     refresh_token = db.Column(db.String(64), nullable=False, index=True)
     refresh_expiration = db.Column(db.DateTime, nullable=False)
+    admin_token = db.Column(db.String(64))
+    admin_expiration = db.Column(db.DateTime)
 
     # --- Relationships ------------------------------------------------------------
     user = db.relationship("User", backref=db.backref("token", lazy="noload"))
@@ -46,6 +48,18 @@ class Token(db.Model):
         self.refresh_token = secrets.token_urlsafe()
         self.refresh_expiration = datetime.utcnow() + timedelta(days=current_app.config["REFRESH_TOKEN_DAYS"])
 
+    def generate_admin(self):
+        """ Generate an short-lived admin <token> """
+
+        self.access_token = secrets.token_urlsafe()
+        self.access_expiration = datetime.utcnow() + timedelta(minutes=0)
+
+        self.refresh_token = secrets.token_urlsafe()
+        self.refresh_expiration = datetime.utcnow() + timedelta(days=0)
+
+        self.admin_token = secrets.token_urlsafe()
+        self.admin_expiration = datetime.utcnow() + timedelta(minutes=5)
+
     def expire(self, delay: int = None):
         """ Add an expiration time on both the <access token> and the <refresh token> """
 
@@ -55,6 +69,7 @@ class Token(db.Model):
 
         self.access_expiration = datetime.utcnow() + timedelta(seconds=delay)
         self.refresh_expiration = datetime.utcnow() + timedelta(seconds=delay)
+        self.admin_expiration = datetime.utcnow() + timedelta(seconds=delay)
 
     @classmethod
     def clean(cls):
@@ -62,6 +77,7 @@ class Token(db.Model):
 
         yesterday = datetime.utcnow() - timedelta(days=1)
         cls.query.filter(cls.refresh_expiration < yesterday).delete()
+        cls.query.filter(cls.admin_expiration < yesterday).delete()
 
         # Commit changes
         db.session.commit()
@@ -84,7 +100,6 @@ class User(db.Model):
     background_image = db.Column(db.String(50), nullable=False, default="default.jpg")
     private = db.Column(db.Boolean, nullable=False, default=False)
     role = db.Column(db.Enum(RoleType), nullable=False, default=RoleType.USER)
-    biography = db.Column(db.Text)
     transition_email = db.Column(db.String(120))
     activated_on = db.Column(db.DateTime)
     last_notif_read_time = db.Column(db.DateTime)
@@ -115,6 +130,8 @@ class User(db.Model):
     anime_list = db.relationship("AnimeList", backref="user", lazy="select")
     movies_list = db.relationship("MoviesList", backref="user", lazy="select")
     games_list = db.relationship("GamesList", backref="user", lazy="select")
+    books_list = db.relationship("BooksList", backref="user", lazy="select")
+    notifications = db.relationship("Notifications", backref="user", lazy="select")
     last_updates = db.relationship("UserLastUpdate", backref="user", order_by="desc(UserLastUpdate.date)", lazy="dynamic")
     followed = db.relationship(
         "User",
@@ -123,7 +140,7 @@ class User(db.Model):
         secondaryjoin=(followers.c.followed_id == id),
         order_by="asc(User.username)",
         backref=db.backref("followers", lazy="dynamic"),
-        lazy="dynamic"
+        lazy="dynamic",
     )
 
     @property
@@ -220,6 +237,14 @@ class User(db.Model):
 
         token = Token(user=self)
         token.generate()
+
+        return token
+
+    def generate_admin_token(self) -> Token:
+        """ Generate and return an authentication token for the user """
+
+        token = Token(user=self)
+        token.generate_admin()
 
         return token
 
@@ -449,6 +474,22 @@ class User(db.Model):
 
         if token:
             if token.access_expiration > datetime.utcnow():
+                token.user.ping()
+                db.session.commit()
+
+                return token.user
+
+    @staticmethod
+    def verify_elevated_token(elevated_token: str) -> User | None:
+        """ Verify the admin <token> viability and return the user object or None """
+
+        if elevated_token is None:
+            return
+
+        token = Token.query.filter_by(admin_token=elevated_token).first()
+
+        if token:
+            if token.admin_expiration > datetime.utcnow():
                 token.user.ping()
                 db.session.commit()
 

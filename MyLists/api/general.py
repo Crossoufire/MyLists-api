@@ -135,7 +135,7 @@ def profile_borders():
     for border in Frames.query.all():
         data.append(dict(
             level=border.level,
-            image=url_for("static", filename=f"/img/profile_borders/{border.image_id}.png")
+            image=url_for("static", filename=f"/img/profile_borders/{border.image_id.replace('0', '')}.png")
         ))
 
     return jsonify(data=data)

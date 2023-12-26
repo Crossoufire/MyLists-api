@@ -1,4 +1,5 @@
 import json
+import time
 from datetime import datetime
 from typing import Dict
 import pytz
@@ -7,7 +8,7 @@ from flask_bcrypt import generate_password_hash
 from MyLists import db
 from MyLists.api.auth import token_auth, current_user
 from MyLists.api.email import send_email
-from MyLists.models.user_models import (Notifications, UserLastUpdate, User)
+from MyLists.models.user_models import (Notifications, UserLastUpdate, User, Token, followers)
 from MyLists.utils.enums import RoleType
 from MyLists.utils.utils import save_picture, get_models_type
 
@@ -74,6 +75,8 @@ def get_current_user() -> Dict:
 @token_auth.login_required
 def profile(username: str):
     """ Get all the user info necessary for its profile """
+
+    time.sleep(3)
 
     # Check if <current_user> can see other <user>
     user = current_user.check_autorization(username)
@@ -299,6 +302,45 @@ def update_settings():
     )
 
     return data
+
+
+@users.route("/delete_account", methods=["POST"])
+@token_auth.login_required
+def delete_account():
+    """ Endpoint allowing the user to remove its account """
+
+    try:
+        # Delete all tokens associated with user
+        Token.query.filter_by(user_id=current_user.id).delete()
+
+        # Delete user
+        User.query.filter_by(id=current_user.id).delete()
+
+        # Remove all entries where user is a follower or followed
+        db.session.query(followers).filter((followers.c.follower_id == current_user.id) |
+                                           (followers.c.followed_id == current_user.id)).delete()
+
+        # Delete user's last update information
+        UserLastUpdate.query.filter_by(user_id=current_user.id).delete()
+
+        # Delete all user's notifications
+        Notifications.query.filter_by(user_id=current_user.id).delete()
+
+        # Get models using <media_type>
+        models_list = get_models_type("List")
+
+        # Delete all media entries associated with user
+        for model in models_list:
+            model.query.filter_by(user_id=current_user.id).delete()
+
+        db.session.commit()
+
+        return {"message": "Your account has been successfully deleted."}, 200
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error trying to delete account [ID = {current_user.id}]: {e}")
+        return abort(500, "Sorry, an error occurred. Please try again later.")
 
 
 @users.route("/notifications", methods=["GET"])

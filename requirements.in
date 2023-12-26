@@ -5,6 +5,7 @@ flask-cors
 flask-mail
 flask-caching
 flask-httpauth
+flask-migrate
 pillow
 PyJWT
 requests

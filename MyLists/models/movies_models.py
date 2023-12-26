@@ -200,7 +200,6 @@ class MoviesList(MediaListMixin, db.Model):
         COMPLETED = "Completed"
         PLAN_TO_WATCH = "Plan to Watch"
 
-    """ --- Methods ---------------------------------------------------------------- """
     def to_dict(self) -> Dict:
         """ Serialization of the movieslist class """
 
@@ -251,7 +250,6 @@ class MoviesList(MediaListMixin, db.Model):
         old_time = current_user.time_spent_movies
         current_user.time_spent_movies = old_time + ((new_value - old_value) * self.media.duration)
 
-    """ --- Class methods --------------------------------------------------------- """
     @classmethod
     def get_media_stats(cls, user: User) -> List[Dict]:
         """ Get the movies stats for a user and return a list of dict """

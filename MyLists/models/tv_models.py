@@ -124,13 +124,15 @@ class TVModel(db.Model):
         """ Get either creator or actor and return its list of series/anime """
 
         if job == "creator":
-            query = cls.query.filter(cls.created_by.ilike("%" + person + "%")).all()
+            query = cls.query.filter(cls.created_by.ilike(f"%{person}%")).all()
         elif job == "actor":
-            # Get <SeriesActors> or <AnimeActors> model
             tv_actors = eval(f"{cls.__name__}Actors")
-
             actors = tv_actors.query.filter(tv_actors.name == person).all()
             query = cls.query.filter(cls.id.in_([p.media_id for p in actors])).all()
+        elif job == "network":
+            tv_network = eval(f"{cls.__name__}Network")
+            networks = tv_network.query.filter(tv_network.network == person).all()
+            query = cls.query.filter(cls.id.in_([p.media_id for p in networks])).all()
         else:
             return abort(404)
 

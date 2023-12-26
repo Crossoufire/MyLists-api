@@ -152,8 +152,8 @@ class MediaListMixin:
         metric = cls.feeling if user.add_feeling else cls.score
         range_ = list(range(6)) if user.add_feeling else [i * 0.5 for i in range(21)]
 
-        # Query database to get media count per metric for given <user_id>
-        media_count = (db.session.query(metric, func.count(metric)).filter(cls.user_id == user.id, metric != None)
+        # Query db to get media count per metric for given <user_id>
+        media_count = (db.session.query(metric, func.count(metric)).filter(cls.user_id == user.id, metric.isnot(None))
                        .group_by(metric).order_by(asc(metric)).all())
 
         # Create dict to store metric count with default values
@@ -163,8 +163,7 @@ class MediaListMixin:
         new_metric = {str(val): count for val, count in media_count}
         metric_counts.update(new_metric)
 
-        # Sort and return values as ordered list
-        return list(OrderedDict(sorted(metric_counts.items())).values())
+        return list(metric_counts.values())
 
     @classmethod
     def get_media_metric(cls, user: db.Model) -> Dict:
@@ -235,6 +234,7 @@ class MediaListMixin:
             "Comments": cls.comment.desc(),
             "Score +": cls.feeling.desc() if is_feeling else cls.score.desc(),
             "Score -": cls.feeling.asc() if is_feeling else cls.score.asc(),
+            "Re-watched": cls.rewatched.desc(),
         }
 
         return sorting_dict

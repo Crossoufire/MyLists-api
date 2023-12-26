@@ -199,4 +199,18 @@ def display_time(minutes: int) -> str:
     days = dt.day - 1
     hours = dt.hour
 
-    return f"{years} years, {months} months, {days} days, {hours} hours"
+    time_components = []
+
+    if years > 0:
+        time_components.append(f"{years} years")
+    if months > 0:
+        time_components.append(f"{months} months")
+    if days > 0:
+        time_components.append(f"{days} days")
+    if hours > 0:
+        time_components.append(f"and {hours} hours")
+
+    if not time_components:
+        return "0 hours"
+
+    return ", ".join(time_components)

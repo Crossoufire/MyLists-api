@@ -47,12 +47,12 @@ class Games(MediaMixin, db.Model):
     """ --- Properties ------------------------------------------------------------ """
     @property
     def formated_date(self):
-        """ return the formated release date """
+        """ return the formatted release date """
         return change_air_format(self.release_date, games=True)
 
     @property
     def developers(self) -> List:
-        """ Return the developers """
+        """ Return the developers as a list of str """
         return [comp.name for comp in self.companies if comp.developer]
 
     @property
@@ -65,8 +65,6 @@ class Games(MediaMixin, db.Model):
         """ Return all the platforms """
         return [r.name for r in self.platforms_rl]
 
-
-    """ --- Methods --------------------------------------------------------------- """
     def to_dict(self, coming_next: bool = False) -> Dict:
         """ Serialization of the games class """
 
@@ -98,13 +96,13 @@ class Games(MediaMixin, db.Model):
             media_id=self.id,
             status=new_status,
             completion=False,
-            playtime=0
+            playtime=0,
         )
+
         db.session.add(user_list)
 
         return 0
 
-    """ --- Class methods --------------------------------------------------------- """
     @classmethod
     def get_persons(cls, job: str, person: str) -> List[Dict]:
         """ From the creator get all the other games """
@@ -181,7 +179,6 @@ class Games(MediaMixin, db.Model):
             current_app.logger.error(f"Error occurred while checking for new releasing game: {e}")
             db.session.rollback()
 
-    """ --- Static methods --------------------------------------------------------- """
     @staticmethod
     def form_only() -> List[str]:
         """ Return the allowed fields for a form """
@@ -195,7 +192,7 @@ class GamesList(MediaListMixin, db.Model):
     GROUP = MediaType.GAMES
     TYPE = "List"
     DEFAULT_SORTING = "Playtime +"
-    DEFAULT_STATUS = Status.COMPLETED
+    DEFAULT_STATUS = Status.PLAYING
     DEFAULT_COLOR = "#196219"
     ORDER = 4
 
@@ -217,13 +214,13 @@ class GamesList(MediaListMixin, db.Model):
     class Status(ExtendedEnum):
         """ New status class for easiness """
 
+        PLAYING = "Playing"
         COMPLETED = "Completed"
         MULTIPLAYER = "Multiplayer"
         ENDLESS = "Endless"
         DROPPED = "Dropped"
         PLAN_TO_PLAY = "Plan to Play"
 
-    """ --- Methods --------------------------------------------------------------- """
     def to_dict(self) -> Dict:
         """ Serialization of the gameslist class """
 
@@ -250,7 +247,6 @@ class GamesList(MediaListMixin, db.Model):
 
         return self.playtime
 
-    """ --- Class methods --------------------------------------------------------- """
     @classmethod
     def get_specific_total(cls, user_id: int):
         """ No specific total for the games """
@@ -302,14 +298,12 @@ class GamesList(MediaListMixin, db.Model):
 
         return stats
 
-    """ --- Static methods -------------------------------------------------------- """
     @staticmethod
     def update_time_spent(old_value: int = 0, new_value: int = 0):
         """ Computed new time for the user """
 
         old_time = current_user.time_spent_games
         current_user.time_spent_games = old_time + (new_value - old_value)
-
 
     @classmethod
     def get_available_sorting(cls, is_feeling: bool) -> Dict:

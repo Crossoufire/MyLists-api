@@ -34,13 +34,11 @@ class Books(MediaMixin, db.Model):
     authors = db.relationship("BooksAuthors")
     list_info = db.relationship("BooksList", back_populates="media", lazy="dynamic")
 
-    """ --- Properties ------------------------------------------------------------ """
     @property
     def authors_list(self) -> List[str]:
         """ Helper function to get the authors of a book """
         return [d.name for d in self.authors]
 
-    """ --- Methods --------------------------------------------------------------- """
     def to_dict(self, coming_next: bool = False) -> Dict:
         """ Serialization of the books class """
 
@@ -78,7 +76,6 @@ class Books(MediaMixin, db.Model):
 
         return new_read
 
-    """ --- Class methods --------------------------------------------------------- """
     @classmethod
     def get_persons(cls, job: str, person: str) -> List[Dict]:
         """ Get all the authors books """
@@ -120,7 +117,6 @@ class Books(MediaMixin, db.Model):
         finally:
             db.session.close()
 
-    """ --- Static methods -------------------------------------------------------- """
     @staticmethod
     def form_only() -> List[str]:
         """ Return the allowed fields for the edit form """
@@ -162,7 +158,6 @@ class BooksList(MediaListMixin, db.Model):
         DROPPED = "Dropped"
         PLAN_TO_READ = "Plan to Read"
 
-    """ --- Methods ---------------------------------------------------------------- """
     def to_dict(self) -> Dict:
         """ Serialization of the bookslist class """
 
@@ -216,7 +211,6 @@ class BooksList(MediaListMixin, db.Model):
         old_time = current_user.time_spent_books
         current_user.time_spent_books = old_time + ((new_value - old_value) * self.TIME_PER_PAGE)
 
-    """ --- Class methods --------------------------------------------------------- """
     @classmethod
     def get_media_stats(cls, user: User) -> List[Dict]:
         """ Get the selected user books stats """
@@ -253,7 +247,6 @@ class BooksList(MediaListMixin, db.Model):
         ]
 
         return stats
-
 
     @classmethod
     def get_available_sorting(cls, is_feeling: bool) -> Dict:

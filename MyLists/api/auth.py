@@ -41,7 +41,7 @@ def basic_auth_error(status: int = HTTPStatus.UNAUTHORIZED) -> Tuple[Dict, int, 
 
 @token_auth.verify_token
 def verify_token(access_token: str) -> str | None:
-    """ Verify the <access token> of the user for each <@token_auth.login_required> routes """
+    """ Verify the user's <token> for each <@token_auth.login_required> routes """
     return User.verify_access_token(access_token) if access_token else None
 
 

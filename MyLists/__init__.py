@@ -2,6 +2,7 @@ import logging
 import os
 from logging.handlers import SMTPHandler, RotatingFileHandler
 from flask import Flask
+from flask_migrate import Migrate
 from flask_bcrypt import Bcrypt
 from flask_caching import Cache
 from flask_cors import CORS
@@ -15,6 +16,7 @@ from config import Config
 config = Config()
 mail = Mail()
 db = SQLAlchemy()
+migrate = Migrate()
 bcrypt = Bcrypt()
 cache = Cache()
 cors = CORS()
@@ -30,9 +32,11 @@ def _import_blueprints(app: Flask):
     from MyLists.api.search import search_bp as api_search_bp
     from MyLists.api.general import general as api_general_bp
     from MyLists.api.errors import errors as api_errors_bp
+    from MyLists.api.admin import admin_bp as api_admin_bp
 
     # Blueprints list
-    api_blueprints = [api_tokens_bp, api_users_bp, api_media_bp, api_search_bp, api_general_bp, api_errors_bp]
+    api_blueprints = [api_tokens_bp, api_users_bp, api_media_bp, api_search_bp, api_general_bp,
+                      api_errors_bp, api_admin_bp]
 
     # Register blueprints
     for blueprint in api_blueprints:
@@ -144,9 +148,13 @@ def init_app() -> Flask:
     # Initialize modules
     mail.init_app(app)
     db.init_app(app)
+    migrate.init_app(app, db, compare_type=False, render_as_batch=True)
     bcrypt.init_app(app)
     cache.init_app(app)
-    cors.init_app(app, origins=["http://localhost:3000", "http://127.0.0.1:3000"], supports_credentials=True)
+    cors.init_app(app, supports_credentials=True, origins=[
+        "http://localhost:3000", "http://127.0.0.1:3000",
+        "http://localhost:8081", "http://127.0.0.1:8081",
+    ])
 
     with app.app_context():
         _import_blueprints(app)
@@ -160,6 +168,7 @@ def init_app() -> Flask:
         add_cli_commands()
 
         # Import first data and populate DB
-        _create_first_db_data()
+        # _create_first_db_data()
+        # db.create_all()
 
         return app

@@ -24,7 +24,7 @@ media_bp = Blueprint("api_media", __name__)
 @token_auth.login_required
 @validate_media_type
 def media_list(media_type: MediaType, username: str):
-    """ Media list route (Series, Anime, Movies, Games, and Books) """
+    """ Media list endpoint (Series, Anime, Movies, Games, and Books) """
 
     # Check if <user> has access
     user = current_user.check_autorization(username)
@@ -43,6 +43,27 @@ def media_list(media_type: MediaType, username: str):
         media_data=media_data,
         pagination=pagination,
         media_type=media_type.value,
+    )
+
+    return jsonify(data=data)
+
+
+@media_bp.route("/stats/<media_type>/<username>", methods=["GET"])
+@token_auth.login_required
+@validate_media_type
+def media_stats(media_type: MediaType, username: str):
+    """ Media stats endpoint (Series, Anime, Movies, Games, and Books) """
+
+    # Check if <user> has access
+    user = current_user.check_autorization(username)
+
+    # Get models using <media_type>
+    _, media_list, *_ = get_models_group(media_type)
+
+    data = dict(
+        user_data=user.to_dict(),
+        media_type=media_type.value,
+        stats=media_list.get_media_stats(user)
     )
 
     return jsonify(data=data)
@@ -165,30 +186,6 @@ def media_details_form(media_type: MediaType, media_id: int):
     return jsonify(data={"message": "Media data successfully updated."})
 
 
-# @media_bp.route("/add_media_to_db/<media_type>/<api_media_id>", methods=["POST"])
-# @token_auth.login_required
-# @validate_media_type
-# def add_media_to_db(media_type: MediaType, api_media_id: int | str):
-#     """ Add the <media> to the database if it doesn't exist yet and return the database ID """
-#
-#     media_class, *_ = get_models_group(media_type)
-#
-#     # Check <media> in local DB
-#     media = media_class.query.filter_by(api_id=api_media_id).first()
-#
-#     # Try to add media from API otherwise
-#     if not media:
-#         API_class = ApiData.get_API_class(media_type)
-#         try:
-#             media = API_class(API_id=api_media_id).save_media_to_db()
-#             db.session.commit()
-#         except Exception as e:
-#             current_app.logger.error(f"[ERROR] - trying to add ({media_type.value}) ID [{api_media_id}] to DB: {e}")
-#             return {"message": "Sorry, a problem occurred trying to load the media info. Please try again later."}, 400
-#
-#     return jsonify(media_id=media.id)
-
-
 @media_bp.route("/refresh/<media_type>/<media_id>", methods=["POST"])
 @token_auth.login_required
 @validate_media_type
@@ -215,12 +212,17 @@ def refresh_media(media_type: MediaType, media_id: int):
 @token_auth.login_required
 @validate_media_type
 def persons(job: str, media_type: MediaType, person: str):
-    """ Get a person's media (director, creator, author, publisher, or actor) """
+    """ Get a person's media (director, creator, author, publisher, network, or actor) """
 
     media_class, *_ = get_models_group(media_type)
 
     # Get data associated to person
-    data = media_class.get_persons(job, person)
+    media_data = media_class.get_persons(job, person)
+
+    data = dict(
+        data=media_data,
+        total=len(media_data),
+    )
 
     return jsonify(data=data)
 
@@ -617,16 +619,16 @@ def update_episode(media_id: int, media_type: MediaType, payload: Any, models: L
 def update_page(media_id: int, media_type: MediaType, payload: Any, models: List[db.Model]):
     """ Update the page read of an updated book from a user """
 
-    # Check if media exists
+    # Validate if media exists
     media = models[1].query.filter_by(user_id=current_user.id, media_id=media_id).first()
     if not media:
         return abort(400)
 
-    # Check page value
+    # Validate page value
     if payload > int(media.media.pages) or payload < 0:
-        return abort(400)
+        return abort(400, "Invalid page value. Please provide a valid page number.")
 
-    # Get old data
+    # Fetch old data
     old_page = media.actual_page
     old_total = media.total
 

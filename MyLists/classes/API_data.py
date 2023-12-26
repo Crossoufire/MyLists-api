@@ -903,11 +903,14 @@ class ApiBooks(ApiData):
 
     @sleep_and_retry
     @limits(calls=2, period=1)
-    def search(self, query: str, page: int = 0):
-        """ Search a book using the Google Books API. <page> attribute begin at zero """
+    def search(self, query: str, page: int = 1):
+        """ Search a book using the Google Books API. """
+
+        # Request body
+        offset = (page - 1) * 10
 
         # API call
-        response = requests.get(f"https://www.googleapis.com/books/v1/volumes?q={query}&startIndex={str(page)}",
+        response = requests.get(f"https://www.googleapis.com/books/v1/volumes?q={query}&startIndex={offset}",
                                 timeout=10)
 
         # Raise for status

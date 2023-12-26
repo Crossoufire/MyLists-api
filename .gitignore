@@ -96,11 +96,13 @@ venv.bak/
 # macOS
 *.DS_Store
 
-# MyLists
-start.sh
-config.ini
-site.db
-site.db-journal
+
+# ----- MyLists-API ----------------------------------------------------------------------
+
+.idea/
+__pycache__/
+instance/
+.env
 
 MyLists/static/profile_pics/*
 !MyLists/static/profile_pics/default.jpg
@@ -114,6 +116,5 @@ MyLists/static/covers/anime_covers/*
 MyLists/static/covers/movies_covers/*
 MyLists/static/covers/games_covers/*
 MyLists/static/covers/books_covers/*
-MyLists/static/covers/movies_collection_covers/*
 
-scheduled.log
+# -------------------------------------------------------------------------------------
