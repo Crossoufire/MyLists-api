@@ -39,9 +39,8 @@ class BaseMediaQuery:
         if current_user.id != self.user.id:
             self._compute_total_and_commons()
 
-        # Media/stats results
+        # Predefined attributes
         self.results = []
-        self.graph_data = []
         self.pages = 0
         self.total = 0
 
@@ -57,7 +56,7 @@ class BaseMediaQuery:
         try:
             sort_filter = self.all_sorting[self.sorting]
         except KeyError:
-            return abort(400)
+            return abort(400, "This sorting is not defined.")
 
         return sort_filter
 
@@ -73,7 +72,7 @@ class BaseMediaQuery:
             elif status == Status.FAVORITE:
                 status_filter = (self.media_list.favorite == True)
         except ValueError:
-            return abort(400)
+            return abort(400, "This status does not exists.")
 
         return status_filter
 
@@ -104,15 +103,6 @@ class BaseMediaQuery:
             self.media_list.user_id == self.user.id, self.media_list.media_id.in_(sub_q)).all()
 
         self.common_ids = [data[0] for data in common_ids]
-
-
-class StatsMediaQuery(BaseMediaQuery):
-    """ Subclass for handling the stats query part """
-
-    def _stats_query(self):
-        """ Return the stats associated with a <user> and a <media_list>. <self.graph_data> is a List[Dict] """
-        self.graph_data = self.media_list.get_media_stats(self.user)
-
 
 class SearchMediaQuery(BaseMediaQuery):
     """ Subclass for handling the search query part """
@@ -172,7 +162,6 @@ class SearchMediaQuery(BaseMediaQuery):
         # Serialize results
         self.results = [item.to_dict() for item in paginate_results.items]
 
-
 class ItemsMediaQuery(BaseMediaQuery):
     """ Subclass for handling the display items query part """
 
@@ -210,24 +199,20 @@ class ItemsMediaQuery(BaseMediaQuery):
         # Serialize results
         self.results = [item.to_dict() for item in paginate_results.items]
 
-
-class MediaListQuery(StatsMediaQuery, SearchMediaQuery, ItemsMediaQuery):
+class MediaListQuery(SearchMediaQuery, ItemsMediaQuery):
     """ Main class that handles different query types using inheritance """
 
     def __init__(self, user: User, media_type: MediaType):
         super().__init__(user, media_type)
 
     def return_results(self) -> Tuple[Dict, Dict]:
-        if self.status == Status.STATS:
-            self._stats_query()
-        elif self.status == Status.SEARCH:
+        if self.status == Status.SEARCH:
             self._search_query()
         else:
             self._items_query()
 
         media_data = dict(
             media_list=self.results,
-            graph_data=self.graph_data,
             total_media=self.total_media,
             common_ids=self.common_ids,
         )

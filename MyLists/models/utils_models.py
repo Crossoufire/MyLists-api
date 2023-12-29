@@ -79,12 +79,18 @@ class MediaMixin:
 
         return to_return
 
-    def get_user_list_info(self) -> bool | Dict:
+    def get_user_list_info(self, personal_class: db.Model) -> Dict | bool:
         """ Retrieve if the <current_user> has the <media> in its <media_list> """
 
-        media_in_user_list = self.list_info.filter_by(user_id=current_user.id).first()
+        user_data = self.list_info.filter_by(user_id=current_user.id).first()
+        user_data = user_data.to_dict() if user_data is not None else False
 
-        return media_in_user_list.to_dict() if media_in_user_list else False
+        if user_data:
+            user_data["username"] = current_user.username
+            user_data["personal"] = personal_class.get_lists_name(current_user.id, self.id)
+            user_data["history"] = UserLastUpdate.get_history(self.GROUP, self.id)
+
+        return user_data
 
 
 class MediaListMixin:
@@ -455,4 +461,4 @@ class MyListsStats(db.Model):
 
 
 # Avoid circular imports
-from MyLists.models.user_models import User, followers
+from MyLists.models.user_models import User, followers, UserLastUpdate

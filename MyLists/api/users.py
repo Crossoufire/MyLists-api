@@ -76,8 +76,6 @@ def get_current_user() -> Dict:
 def profile(username: str):
     """ Get all the user info necessary for its profile """
 
-    time.sleep(3)
-
     # Check if <current_user> can see other <user>
     user = current_user.check_autorization(username)
 

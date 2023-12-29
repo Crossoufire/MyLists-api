@@ -7,15 +7,14 @@ from PIL.Image import Resampling
 from flask import current_app
 from flask import request, jsonify, Blueprint, abort
 from MyLists import db
-from MyLists.classes.API_data import ApiData
 from MyLists.api.auth import token_auth, current_user
+from MyLists.classes.API_data import ApiData
 from MyLists.classes.Medialist_query import MediaListQuery
 from MyLists.models.user_models import UserLastUpdate, get_coming_next
 from MyLists.scheduled_tasks.media_refresher import refresh_element_data
 from MyLists.utils.decorators import validate_media_type, media_endpoint_decorator
 from MyLists.utils.enums import MediaType, RoleType, Status
 from MyLists.utils.utils import get_models_group
-
 
 media_bp = Blueprint("api_media", __name__)
 
@@ -48,6 +47,53 @@ def media_list(media_type: MediaType, username: str):
     return jsonify(data=data)
 
 
+@media_bp.route("/list/personal/<media_type>/<username>", methods=["GET"])
+@token_auth.login_required
+@validate_media_type
+def personal_media_list(media_type: MediaType, username: str):
+    """ Personal Media list endpoint (Series, Anime, Movies, Games, and Books) """
+
+    # Check if <user> has access
+    user = current_user.check_autorization(username)
+
+    # Get models using <media_type>
+    *_, personal_class = get_models_group(media_type)
+
+    # Fetch data from database
+    media_data = personal_class.query.filter(personal_class.user_id == user.id).all()
+
+    data = dict(
+        user_data=user.to_dict(),
+        media_data=list(set(media.list_name for media in media_data)),
+        media_type=media_type.value,
+    )
+
+    return jsonify(data=data)
+
+
+@media_bp.route("/media_in_list/<media_type>/<username>", methods=["GET"])
+@token_auth.login_required
+@validate_media_type
+def show_items_personal_list(media_type: MediaType, username: str):
+    """ Personal Media list endpoint (Series, Anime, Movies, Games, and Books) """
+
+    try:
+        list_name = request.args.get("list")
+    except:
+        return abort(400, "List name not found.")
+
+    # Check if <user> has access
+    user = current_user.check_autorization(username)
+
+    # Get models using <media_type>
+    *_, p_class = get_models_group(media_type)
+
+    # Fetch data from database
+    media_data = p_class.query.filter(p_class.user_id == user.id, p_class.list_name == list_name).all()
+
+    return jsonify(data=[media.to_dict() for media in media_data])
+
+
 @media_bp.route("/stats/<media_type>/<username>", methods=["GET"])
 @token_auth.login_required
 @validate_media_type
@@ -75,9 +121,10 @@ def media_stats(media_type: MediaType, username: str):
 def media_details(media_type: MediaType, media_id: int):
     """ Return the details of a media """
 
-    media_class, *_ = get_models_group(media_type)
+    media_class, *_, personal_class = get_models_group(media_type)
+    isSearch = request.args.get("search")
 
-    if request.args.get("search"):
+    if isSearch:
         media = media_class.query.filter_by(api_id=media_id).first()
         if not media:
             API_class = ApiData.get_API_class(media_type)
@@ -85,24 +132,19 @@ def media_details(media_type: MediaType, media_id: int):
                 media = API_class(API_id=media_id).save_media_to_db()
                 db.session.commit()
             except Exception as e:
-                current_app.logger.error(f"[ERROR] - trying to add ({media_type.value}) ID [{media_id}] to DB: {e}")
-                return {"message": "Sorry, a problem occurred trying to load the media info. Please try again later."}, 400
+                current_app.logger.error(f"Error trying to add ({media_type.value}) ID [{media_id}] to DB: {e}")
+                return {"message": "Sorry, an error occurred loading the media info. Please try again later."}, 400
     else:
         # Check <media> in database
         media = media_class.query.filter_by(id=media_id).first()
         if not media:
-            return abort(404)
-
-    # Check if <current_user> has <media> in his list
-    current_user_data = media.get_user_list_info()
-    if current_user_data:
-        current_user_data["history"] = UserLastUpdate.get_history(media_type, media_id)
+            return abort(404, "The media could not be found.")
 
     data = dict(
-        user_data=current_user_data,
         media=media.to_dict(),
+        user_data=media.get_user_list_info(personal_class),
         follows_data=media.in_follows_lists(),
-        redirect=True if request.args.get("search") else False,
+        redirect=True if isSearch else False,
     )
 
     return jsonify(data=data)
@@ -241,9 +283,9 @@ def coming_next():
 
 @media_bp.route("/add_media", methods=["POST"])
 @token_auth.login_required
-@media_endpoint_decorator(type_=None)
+@media_endpoint_decorator()
 def add_media(media_id: int, media_type: MediaType, payload: Any, models: List[db.Model]):
-    """ Add a <media> to the current_user """
+    """ Add a <media> to the <current_user> and return the information """
 
     # Rename for clarity
     new_status = payload
@@ -258,12 +300,12 @@ def add_media(media_id: int, media_type: MediaType, payload: Any, models: List[d
     except:
         return abort(400)
 
-    # Check <media> not in user list
+    # Check media from MediaList table not in user list
     in_list = models[1].query.filter_by(user_id=current_user.id, media_id=media_id).first()
     if in_list:
         return abort(400)
 
-    # Check if <media> exists
+    # Check if <media> from Media table exists
     media = models[0].query.filter_by(id=media_id).first()
     if not media:
         return abort(400)
@@ -278,18 +320,17 @@ def add_media(media_id: int, media_type: MediaType, payload: Any, models: List[d
     # Set last update
     UserLastUpdate.set_last_update(media=media, media_type=media_type, new_status=new_status)
 
-    # Compute new time spent
+    # Compute new time spent (recall necessary!)
     in_list = models[1].query.filter_by(user_id=current_user.id, media_id=media_id).first()
     in_list.update_time_spent(new_value=new_watched)
 
     # Commit changes
     db.session.commit()
 
-    # Return current user media info
-    data = media.get_user_list_info()
-    data["history"] = UserLastUpdate.get_history(media_type, media_id)
+    # Return <current user> media info
+    user_data = media.get_user_list_info(models[-1])
 
-    return jsonify(data=data)
+    return jsonify(data=user_data)
 
 
 # noinspection PyUnusedLocal
@@ -458,6 +499,75 @@ def update_redo(media_id: int, media_type: MediaType, payload: Any, models: List
     current_app.logger.info(f"[{current_user.id}] Media ID {media_id} [{media_type}] rewatched {payload}x times")
 
     return {}, 204
+
+
+@media_bp.route("/add_to_personal_list", methods=["POST"])
+@token_auth.login_required
+@media_endpoint_decorator(str)
+def add_to_personal_list(media_id: int, media_type: MediaType, payload: Any, models: List[db.Model]):
+    """ Create a new personal list for a user """
+
+    media = models[1].query.filter_by(user_id=current_user.id, media_id=media_id).first()
+    if media is None:
+        return abort(400)
+
+    new_list = models[-1](user_id=current_user.id, media_id=media_id, list_name=payload)
+
+    # Commit changes
+    db.session.add(new_list)
+    db.session.commit()
+
+    current_app.logger.info(f"User [{current_user.id}] added a {media_type.value} [ID {media_id}] to "
+                            f"its personal list: {payload}.")
+
+    return {}, 204
+
+
+@media_bp.route("/remove_from_personal_list", methods=["POST"])
+@token_auth.login_required
+@media_endpoint_decorator(str)
+def remove_from_personal_list(media_id: int, media_type: MediaType, payload: Any, models: List[db.Model]):
+    """ Remove a media from a personal list for a user """
+
+    media = models[1].query.filter_by(user_id=current_user.id, media_id=media_id).first()
+    if media is None:
+        return abort(400)
+
+    models[-1].query.filter(models[-1].user_id == current_user.id, models[-1].media_id == media_id,
+                            models[-1].list_name == payload).delete()
+
+    # Commit changes
+    db.session.commit()
+
+    current_app.logger.info(f"User [{current_user.id}] removed a {media_type.value} ID [{media_id}] from its "
+                            f"personal list: {payload}.")
+
+    return {}, 204
+
+
+@media_bp.route("/remove_personal_list", methods=["POST"])
+@token_auth.login_required
+def remove_personal_list():
+    """ Remove a media from a personal list for a user """
+
+    try:
+        # Parse JSON data
+        json_data = request.get_json()
+        media_type = MediaType(json_data["media_type"])
+        list_name = json_data["list_name"]
+    except:
+        return abort(400)
+
+    *_, p_class = get_models_group(media_type)
+
+    p_class.query.filter(p_class.user_id == current_user.id, p_class.list_name == list_name).delete()
+
+    # Commit changes
+    db.session.commit()
+
+    current_app.logger.info(f"User [{current_user.id}] removed this personal list: {list_name} ({media_type.value})")
+
+    return {"message": "List successfully deleted."}, 200
 
 
 @media_bp.route("/update_comment", methods=["POST"])

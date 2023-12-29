@@ -305,3 +305,44 @@ class BooksAuthors(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     media_id = db.Column(db.Integer, db.ForeignKey('books.id'), nullable=False)
     name = db.Column(db.String(150))
+
+
+class PersonalBooksList(db.Model):
+    """ Personal BooksList SQL model """
+
+    GROUP = MediaType.BOOKS
+    ORDER = 3
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    media_id = db.Column(db.Integer, db.ForeignKey("books.id"), nullable=False)
+    list_name = db.Column(db.String(64), nullable=False)
+
+    # --- Relationships -----------------------------------------------------------
+    media = db.relationship("Books", lazy=False)
+
+    def to_dict(self) -> Dict:
+        """ Serialization of the personal bookslist class """
+
+        media_dict = {}
+        if hasattr(self, "__table__"):
+            media_dict = {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
+        # Add more info
+        media_dict["media_cover"] = self.media.media_cover
+        media_dict["media_name"] = self.media.name
+
+        return media_dict
+
+    @classmethod
+    def get_lists_name(cls, user_id: int, media_id: int) -> Dict:
+        """ Get all the list names in which the media is in for a specific user """
+
+        # Get all existing list names for the user
+        all_names = db.session.query(cls.list_name).filter_by(user_id=user_id).group_by(cls.list_name).all()
+        all_names = [name[0] for name in all_names]
+
+        already_in = db.session.query(cls.list_name).filter_by(user_id=user_id, media_id=media_id).all()
+        already_in = [name[0] for name in already_in]
+
+        return {"already_in": already_in, "available": list(set(all_names) - set(already_in))}

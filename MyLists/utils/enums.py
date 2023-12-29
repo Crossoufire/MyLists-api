@@ -11,7 +11,7 @@ class ExtendedEnum(Enum):
 
         enum_values = [c.value for c in cls]
         
-        return ["All"] + enum_values + ["Favorite", "Stats"] if extra else enum_values
+        return ["All"] + enum_values + ["Favorite"] if extra else enum_values
 
 
 class MediaType(ExtendedEnum):
