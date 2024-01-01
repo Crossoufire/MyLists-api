@@ -1,5 +1,4 @@
 import json
-from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
@@ -82,10 +81,10 @@ class MediaMixin:
     def get_user_list_info(self, label_class: db.Model) -> Dict | bool:
         """ Retrieve if the <current_user> has the <media> in its <media_list> and label_class """
 
-        user_data = self.list_info.filter_by(user_id=current_user.id).first()
-        user_data = user_data.to_dict() if user_data is not None else False
+        query = self.list_info.filter_by(user_id=current_user.id).first()
+        user_data = query.to_dict() if query is not None else False
 
-        if user_data:
+        if user_data is not False:
             user_data["username"] = current_user.username
             user_data["labels"] = label_class.get_labels_name(current_user.id, self.id)
             user_data["history"] = UserLastUpdate.get_history(self.GROUP, self.id)

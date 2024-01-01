@@ -100,9 +100,6 @@ venv.bak/
 # ----- MyLists-API ----------------------------------------------------------------------
 
 .idea/
-__pycache__/
-instance/
-.env
 
 MyLists/static/profile_pics/*
 !MyLists/static/profile_pics/default.jpg

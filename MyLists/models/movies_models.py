@@ -130,6 +130,7 @@ class Movies(MediaMixin, db.Model):
         """ Check for the new releasing movies in a week or less from the TMDB API """
 
         try:
+            # noinspection PyComparisonWithNone
             query = (db.session.query(cls.id, MoviesList.user_id, cls.release_date, cls.name)
             .join(MoviesList, cls.id == MoviesList.media_id)
             .filter(and_(

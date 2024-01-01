@@ -12,7 +12,7 @@ This backend uses [Flask](https://flask.palletsprojects.com/).
 # Features
 
 * Create a list for all your series, anime, movies, games and books. 
-* Get statistics about your lists (Time spent, number of episodes watched, prefered genres, etc...)
+* Get statistics about your lists (Time spent, number of episodes watched, preferred genres, etc...)
 * Get informed of your next series, anime and movies to airs.
 * Follows your friends and get updates.
 * Compare your lists with your follows.
@@ -38,7 +38,7 @@ cd MyLists
 pip install -r requirements.txt
 ```
 
-## Setup the .flaskenv and the .env file
+## Set up the .flaskenv and the .env file
 - In the `.flaskenv` setup the `FLASK_DEBUG` to either `0` or `1` (default to `1`).
 - Create a `.env` file:
 ```

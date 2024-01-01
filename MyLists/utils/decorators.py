@@ -1,6 +1,6 @@
 import time
 from functools import wraps
-from typing import Callable, Any
+from typing import Callable
 from flask import abort, request
 from MyLists.utils.enums import MediaType
 from MyLists.utils.utils import get_models_group
