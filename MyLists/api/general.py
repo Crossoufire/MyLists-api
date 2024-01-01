@@ -139,3 +139,17 @@ def profile_borders():
         ))
 
     return jsonify(data=data)
+
+
+@general.route("/changelog", methods=["GET"])
+def changelog():
+    """ Fetch the changelog """
+
+    import os
+
+    changelog_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../CHANGELOG.md"))
+
+    with open(changelog_path) as fp:
+        data = fp.read()
+
+    return jsonify(data=data), 200, {"Content-Type": "text/markdown"}
