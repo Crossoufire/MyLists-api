@@ -9,7 +9,7 @@ from sqlalchemy.sql.functions import count
 from MyLists import db
 from MyLists.api.auth import current_user
 from MyLists.models.user_models import User, UserLastUpdate, Notifications
-from MyLists.models.utils_models import MediaMixin, MediaListMixin
+from MyLists.models.utils_models import MediaMixin, MediaListMixin, MediaLabelMixin
 from MyLists.utils.enums import MediaType, Status, ExtendedEnum
 from MyLists.utils.utils import change_air_format
 
@@ -120,21 +120,19 @@ class TVModel(db.Model):
 
     """ --- Class methods --------------------------------------------------------- """
     @classmethod
-    def get_persons(cls, job: str, person: str) -> List[Dict]:
+    def get_information(cls, job: str, info: str) -> List[Dict]:
         """ Get either creator or actor and return its list of series/anime """
 
         if job == "creator":
-            query = cls.query.filter(cls.created_by.ilike(f"%{person}%")).all()
+            query = cls.query.filter(cls.created_by.ilike(f"%{info}%")).all()
         elif job == "actor":
             tv_actors = eval(f"{cls.__name__}Actors")
-            actors = tv_actors.query.filter(tv_actors.name == person).all()
-            query = cls.query.filter(cls.id.in_([p.media_id for p in actors])).all()
+            query = cls.query.join(tv_actors, tv_actors.media_id == cls.id).filter(tv_actors.name == info).all()
         elif job == "network":
-            tv_network = eval(f"{cls.__name__}Network")
-            networks = tv_network.query.filter(tv_network.network == person).all()
-            query = cls.query.filter(cls.id.in_([p.media_id for p in networks])).all()
+            tv_net = eval(f"{cls.__name__}Network")
+            query = cls.query.join(tv_net, tv_net.media_id == cls.id).filter(tv_net.network == info).all()
         else:
-            return abort(404)
+            return abort(400)
 
         return [q.to_dict(coming_next=True) for q in query]
 
@@ -404,8 +402,8 @@ class SeriesActors(db.Model):
     name = db.Column(db.String(150))
 
 
-class PersonalSeriesList(db.Model):
-    """ Personal SeriesList SQL model """
+class SeriesLabels(MediaLabelMixin, db.Model):
+    """ SeriesLabels SQL model """
 
     GROUP = MediaType.SERIES
     ORDER = 0
@@ -413,13 +411,13 @@ class PersonalSeriesList(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     media_id = db.Column(db.Integer, db.ForeignKey("series.id"), nullable=False)
-    list_name = db.Column(db.String(64), nullable=False)
+    label = db.Column(db.String(64), nullable=False)
 
     # --- Relationships -----------------------------------------------------------
     media = db.relationship("Series", lazy=False)
 
     def to_dict(self) -> Dict:
-        """ Serialization of the personal serieslist class """
+        """ Serialization of the SeriesLabels class """
 
         media_dict = {}
         if hasattr(self, "__table__"):
@@ -430,19 +428,6 @@ class PersonalSeriesList(db.Model):
         media_dict["media_name"] = self.media.name
 
         return media_dict
-
-    @classmethod
-    def get_lists_name(cls, user_id: int, media_id: int) -> Dict:
-        """ Get all the list names in which the media is in for a specific user """
-
-        # Get all existing list names for the user
-        all_names = db.session.query(cls.list_name).filter_by(user_id=user_id).group_by(cls.list_name).all()
-        all_names = [name[0] for name in all_names]
-
-        already_in = db.session.query(cls.list_name).filter_by(user_id=user_id, media_id=media_id).all()
-        already_in = [name[0] for name in already_in]
-
-        return {"already_in": already_in, "available": list(set(all_names) - set(already_in))}
 
 
 # --- ANIME -------------------------------------------------------------------------------------------------------
@@ -701,8 +686,8 @@ class AnimeActors(db.Model):
     name = db.Column(db.String(150))
 
 
-class PersonalAnimeList(db.Model):
-    """ Personal AnimeList SQL model """
+class AnimeLabels(MediaLabelMixin, db.Model):
+    """ AnimeLabels SQL model """
 
     GROUP = MediaType.ANIME
     ORDER = 1
@@ -710,13 +695,13 @@ class PersonalAnimeList(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     media_id = db.Column(db.Integer, db.ForeignKey("anime.id"), nullable=False)
-    list_name = db.Column(db.String(64), nullable=False)
+    label = db.Column(db.String(64), nullable=False)
 
     # --- Relationships -----------------------------------------------------------
     media = db.relationship("Anime", lazy=False)
 
     def to_dict(self) -> Dict:
-        """ Serialization of the personal animeList class """
+        """ Serialization of the AnimeLabels class """
 
         media_dict = {}
         if hasattr(self, "__table__"):
@@ -727,16 +712,3 @@ class PersonalAnimeList(db.Model):
         media_dict["media_name"] = self.media.name
 
         return media_dict
-
-    @classmethod
-    def get_lists_name(cls, user_id: int, media_id: int) -> Dict:
-        """ Get all the list names in which the media is in for a specific user """
-
-        # Get all existing list names for the user
-        all_names = db.session.query(cls.list_name).filter_by(user_id=user_id).group_by(cls.list_name).all()
-        all_names = [name[0] for name in all_names]
-
-        already_in = db.session.query(cls.list_name).filter_by(user_id=user_id, media_id=media_id).all()
-        already_in = [name[0] for name in already_in]
-
-        return {"already_in": already_in, "available": list(set(all_names) - set(already_in))}

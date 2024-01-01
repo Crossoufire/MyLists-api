@@ -12,8 +12,6 @@ from PIL.Image import Resampling
 from flask import url_for, current_app, abort
 from howlongtobeatpy import HowLongToBeat
 from ratelimit import sleep_and_retry, limits
-from werkzeug.exceptions import HTTPException
-
 from MyLists import db
 from MyLists.models.books_models import Books, BooksGenre, BooksAuthors
 from MyLists.models.games_models import Games, GamesCompanies, GamesPlatforms, GamesGenre
@@ -25,7 +23,6 @@ from MyLists.utils.utils import get_subclasses, change_air_format, is_latin, cle
 
 
 """ --- GENERAL --------------------------------------------------------------------------------------------- """
-
 
 class ApiData:
     """ Main class to manipulate the different APIs """
@@ -340,7 +337,6 @@ class ApiTV(ApiTMDB):
 
 
 """ --- CLASS CALL ------------------------------------------------------------------------------------------ """
-
 
 class ApiSeries(ApiTV):
     """ TMDB API class specifically for the Series """

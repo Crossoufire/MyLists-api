@@ -33,10 +33,12 @@ def _import_blueprints(app: Flask):
     from MyLists.api.general import general as api_general_bp
     from MyLists.api.errors import errors as api_errors_bp
     from MyLists.api.admin import admin_bp as api_admin_bp
+    from MyLists.api.details import details_bp as api_details_bp
+    from MyLists.api.lists import lists_bp as api_lists_bp
 
     # Blueprints list
     api_blueprints = [api_tokens_bp, api_users_bp, api_media_bp, api_search_bp, api_general_bp,
-                      api_errors_bp, api_admin_bp]
+                      api_errors_bp, api_admin_bp, api_details_bp, api_lists_bp]
 
     # Register blueprints
     for blueprint in api_blueprints:
@@ -163,12 +165,7 @@ def init_app() -> Flask:
             _create_app_logger(app)
             _create_mail_handler(app)
 
-        # Import CLI commands from <scheduled_tasks>
         from MyLists.scheduled_tasks.scheduled_tasks import add_cli_commands
         add_cli_commands()
-
-        # Import first data and populate DB
-        # _create_first_db_data()
-        # db.create_all()
 
         return app

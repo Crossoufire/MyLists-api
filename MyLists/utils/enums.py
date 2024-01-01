@@ -11,7 +11,7 @@ class ExtendedEnum(Enum):
 
         enum_values = [c.value for c in cls]
         
-        return ["All"] + enum_values + ["Favorite"] if extra else enum_values
+        return ["All"] + enum_values + ["Favorite", "Stats", "Labels"] if extra else enum_values
 
 
 class MediaType(ExtendedEnum):
@@ -44,6 +44,7 @@ class Status(str, ExtendedEnum):
     SEARCH = "Search"
     FAVORITE = "Favorite"
     STATS = "Stats"
+    LABELS = "Labels"
 
 
 class RoleType(str, ExtendedEnum):

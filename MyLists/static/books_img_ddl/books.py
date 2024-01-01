@@ -244,8 +244,8 @@ class GoogleImages:
             return self._image_objects_from_pack(self._extract_data_pack(respData)), self.get_all_tabs(respData)
         except Exception as e:
             print(e)
-            print('Image objects data unpacking failed. Please leave a comment with the above error at '
-                  'https://github.com/hardikvasa/google-images-download/pull/298')
+            print("Image objects data unpacking failed. Please leave a comment with the above error at "
+                  "https://github.com/hardikvasa/google-images-download/pull/298")
             sys.exit()
 
     def get_all_tabs(self, page):

@@ -228,9 +228,7 @@ class User(db.Model):
         """ Revoke all the <access token> and <refresh token> of the current user """
 
         db.session.delete(db.select(Token).filter(Token.user == self))
-        # Token.query.filter(Token.user == self).delete()
         db.session.commit()
-        print("it worked")
 
     def generate_auth_token(self) -> Token:
         """ Generate and return an authentication token for the user """
@@ -356,7 +354,7 @@ class User(db.Model):
     def get_one_media_details(self, media_type: MediaType) -> Dict:
         """ Get one media details for the selected user """
 
-        _, media_list, *_ = get_models_group(media_type)
+        _, media_list, *_, label_class = get_models_group(media_type)
 
         media_dict = dict(
             media_type=media_type.value,
@@ -364,6 +362,7 @@ class User(db.Model):
             count_per_metric=media_list.get_media_count_per_metric(self),
             time_hours=int(getattr(self, f"time_spent_{media_type.value}") / 60),
             time_days=int(getattr(self, f"time_spent_{media_type.value}") / 1440),
+            labels=label_class.get_total_labels(self.id),
         )
 
         media_dict.update(media_list.get_media_count_per_status(self.id))

@@ -7,7 +7,7 @@ from sqlalchemy import func, text
 from MyLists import db
 from MyLists.api.auth import current_user
 from MyLists.models.user_models import User, UserLastUpdate, Notifications
-from MyLists.models.utils_models import MediaMixin, MediaListMixin
+from MyLists.models.utils_models import MediaMixin, MediaListMixin, MediaLabelMixin
 from MyLists.utils.utils import change_air_format
 from MyLists.utils.enums import MediaType, Status, ExtendedEnum
 
@@ -77,12 +77,12 @@ class Books(MediaMixin, db.Model):
         return new_read
 
     @classmethod
-    def get_persons(cls, job: str, person: str) -> List[Dict]:
+    def get_information(cls, job: str, info: str) -> List[Dict]:
         """ Get all the authors books """
 
         if job == "creator":
-            authors = BooksAuthors.query.filter(BooksAuthors.name == person).all()
-            query = cls.query.filter(cls.id.in_([p.media_id for p in authors])).all()
+            query = (cls.query.join(BooksAuthors, BooksAuthors.media_id == cls.id)
+                     .filter(BooksAuthors.name == info).all())
         else:
             return abort(400)
 
@@ -307,7 +307,7 @@ class BooksAuthors(db.Model):
     name = db.Column(db.String(150))
 
 
-class PersonalBooksList(db.Model):
+class BooksLabels(MediaLabelMixin, db.Model):
     """ Personal BooksList SQL model """
 
     GROUP = MediaType.BOOKS
@@ -316,13 +316,13 @@ class PersonalBooksList(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     media_id = db.Column(db.Integer, db.ForeignKey("books.id"), nullable=False)
-    list_name = db.Column(db.String(64), nullable=False)
+    label = db.Column(db.String(64), nullable=False)
 
     # --- Relationships -----------------------------------------------------------
     media = db.relationship("Books", lazy=False)
 
     def to_dict(self) -> Dict:
-        """ Serialization of the personal bookslist class """
+        """ Serialization of the BooksLabels class """
 
         media_dict = {}
         if hasattr(self, "__table__"):
@@ -333,16 +333,3 @@ class PersonalBooksList(db.Model):
         media_dict["media_name"] = self.media.name
 
         return media_dict
-
-    @classmethod
-    def get_lists_name(cls, user_id: int, media_id: int) -> Dict:
-        """ Get all the list names in which the media is in for a specific user """
-
-        # Get all existing list names for the user
-        all_names = db.session.query(cls.list_name).filter_by(user_id=user_id).group_by(cls.list_name).all()
-        all_names = [name[0] for name in all_names]
-
-        already_in = db.session.query(cls.list_name).filter_by(user_id=user_id, media_id=media_id).all()
-        already_in = [name[0] for name in already_in]
-
-        return {"already_in": already_in, "available": list(set(all_names) - set(already_in))}

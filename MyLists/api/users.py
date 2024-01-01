@@ -1,5 +1,4 @@
 import json
-import time
 from datetime import datetime
 from typing import Dict
 import pytz
@@ -25,7 +24,7 @@ def register_user():
         return abort(400)
 
     # Necessary register fields
-    fields = ["username", "email", "password", "callback"]
+    fields = ("username", "email", "password", "callback")
 
     if not all(f in data for f in fields):
         return {"message": f"Not all fields included: {', '.join(fields)}"}, 400
@@ -302,6 +301,37 @@ def update_settings():
     return data
 
 
+@users.route("/notifications", methods=["GET"])
+@token_auth.login_required
+def notifications():
+    """ Fetch the current user's notifications """
+
+    # Change last time <current_user> looked at notifications
+    current_user.last_notif_read_time = datetime.utcnow()
+
+    # Commit changes
+    db.session.commit()
+
+    # Get current user last notifications
+    notifs = current_user.get_last_notifications(limit_=8)
+
+    results = [{
+        "media_id": notif.media_id,
+        "media_type": notif.media_type,
+        "timestamp": notif.timestamp.replace(tzinfo=pytz.UTC).isoformat(),
+        "payload": json.loads(notif.payload_json),
+    } for notif in notifs]
+
+    return jsonify(data=results)
+
+
+@users.route("/notifications/count", methods=["GET"])
+@token_auth.login_required
+def count_notifs():
+    """ Fetch the current user's notifications """
+    return jsonify(data=current_user.count_notifications()), 200
+
+
 @users.route("/delete_account", methods=["POST"])
 @token_auth.login_required
 def delete_account():
@@ -339,34 +369,3 @@ def delete_account():
         db.session.rollback()
         current_app.logger.error(f"Error trying to delete account [ID = {current_user.id}]: {e}")
         return abort(500, "Sorry, an error occurred. Please try again later.")
-
-
-@users.route("/notifications", methods=["GET"])
-@token_auth.login_required
-def notifications():
-    """ Fetch the current user's notifications """
-
-    # Change last time <current_user> looked at notifications
-    current_user.last_notif_read_time = datetime.utcnow()
-
-    # Commit changes
-    db.session.commit()
-
-    # Get current user last notifications
-    notifs = current_user.get_last_notifications(limit_=8)
-
-    results = [{
-        "media_id": notif.media_id,
-        "media_type": notif.media_type,
-        "timestamp": notif.timestamp.replace(tzinfo=pytz.UTC).isoformat(),
-        "payload": json.loads(notif.payload_json),
-    } for notif in notifs]
-
-    return jsonify(data=results)
-
-
-@users.route("/notifications/count", methods=["GET"])
-@token_auth.login_required
-def count_notifications():
-    """ Fetch the current user's notifications """
-    return jsonify(data=current_user.count_notifications()), 200

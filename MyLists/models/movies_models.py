@@ -8,7 +8,7 @@ from sqlalchemy import func, text, and_
 from MyLists import db
 from MyLists.api.auth import current_user
 from MyLists.models.user_models import User, UserLastUpdate, Notifications
-from MyLists.models.utils_models import MediaMixin, MediaListMixin
+from MyLists.models.utils_models import MediaMixin, MediaListMixin, MediaLabelMixin
 from MyLists.utils.enums import MediaType, Status, ExtendedEnum
 from MyLists.utils.utils import change_air_format
 
@@ -83,16 +83,16 @@ class Movies(MediaMixin, db.Model):
 
     """ --- Class methods --------------------------------------------------------- """
     @classmethod
-    def get_persons(cls, job: str, person: str) -> List[Dict]:
+    def get_information(cls, job: str, info: str) -> List[Dict]:
         """ Get the movies from a specific creator or actor """
 
         if job == "creator":
-            query = cls.query.filter(cls.director_name.ilike(f"%{person}%")).all()
+            query = cls.query.filter(cls.director_name.ilike(f"%{info}%")).all()
         elif job == "actor":
-            actors = MoviesActors.query.filter(MoviesActors.name == person).all()
-            query = cls.query.filter(cls.id.in_([p.media_id for p in actors])).all()
+            query = (cls.query.join(MoviesActors, MoviesActors.media_id == cls.id)
+                     .filter(MoviesActors.name == info).all())
         else:
-            return abort(404)
+            return abort(400)
 
         return [q.to_dict(coming_next=True) for q in query]
 
@@ -322,8 +322,8 @@ class MoviesActors(db.Model):
     name = db.Column(db.String(150))
 
 
-class PersonalMoviesList(db.Model):
-    """ Personal Movieslist SQL model """
+class MoviesLabels(MediaLabelMixin, db.Model):
+    """ MoviesLabels SQL model """
 
     GROUP = MediaType.MOVIES
     ORDER = 2
@@ -331,13 +331,13 @@ class PersonalMoviesList(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     media_id = db.Column(db.Integer, db.ForeignKey("movies.id"), nullable=False)
-    list_name = db.Column(db.String(64), nullable=False)
+    label = db.Column(db.String(64), nullable=False)
 
     # --- Relationships -----------------------------------------------------------
     media = db.relationship("Movies", lazy=False)
 
     def to_dict(self) -> Dict:
-        """ Serialization of the personal movieslist class """
+        """ Serialization of the MoviesLabels class """
 
         media_dict = {}
         if hasattr(self, "__table__"):
@@ -348,16 +348,3 @@ class PersonalMoviesList(db.Model):
         media_dict["media_name"] = self.media.name
 
         return media_dict
-
-    @classmethod
-    def get_lists_name(cls, user_id: int, media_id: int) -> Dict:
-        """ Get all the list names in which the media is in for a specific user """
-
-        # Get all existing list names for the user
-        all_names = db.session.query(cls.list_name).filter_by(user_id=user_id).group_by(cls.list_name).all()
-        all_names = [name[0] for name in all_names]
-
-        already_in = db.session.query(cls.list_name).filter_by(user_id=user_id, media_id=media_id).all()
-        already_in = [name[0] for name in already_in]
-
-        return {"already_in": already_in, "available": list(set(all_names) - set(already_in))}

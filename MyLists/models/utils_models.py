@@ -79,15 +79,15 @@ class MediaMixin:
 
         return to_return
 
-    def get_user_list_info(self, personal_class: db.Model) -> Dict | bool:
-        """ Retrieve if the <current_user> has the <media> in its <media_list> """
+    def get_user_list_info(self, label_class: db.Model) -> Dict | bool:
+        """ Retrieve if the <current_user> has the <media> in its <media_list> and label_class """
 
         user_data = self.list_info.filter_by(user_id=current_user.id).first()
         user_data = user_data.to_dict() if user_data is not None else False
 
         if user_data:
             user_data["username"] = current_user.username
-            user_data["personal"] = personal_class.get_lists_name(current_user.id, self.id)
+            user_data["labels"] = label_class.get_labels_name(current_user.id, self.id)
             user_data["history"] = UserLastUpdate.get_history(self.GROUP, self.id)
 
         return user_data
@@ -244,6 +244,28 @@ class MediaListMixin:
         }
 
         return sorting_dict
+
+
+class MediaLabelMixin:
+    """ LabelMixin SQLAlchemy model for Personal List """
+
+    @classmethod
+    def get_labels_name(cls, user_id: int, media_id: int) -> Dict | List:
+        """ Get all the labels names in which the media is in for a specific user """
+
+        # Get all existing labels names for the user
+        all_labels = db.session.query(cls.label).filter_by(user_id=user_id).group_by(cls.label).all()
+        all_labels = [l[0] for l in all_labels]
+
+        already_in = db.session.query(cls.label).filter_by(user_id=user_id, media_id=media_id).all()
+        already_in = [l[0] for l in already_in]
+
+        return {"already_in": already_in, "available": list(set(all_labels) - set(already_in))}
+
+    @classmethod
+    def get_total_labels(cls, user_id: int) -> Dict:
+        all_labels = db.session.query(cls.label).filter_by(user_id=user_id).group_by(cls.label).all()
+        return {"count": len(all_labels), "names": [l[0] for l in all_labels]}
 
 
 class Badges(db.Model):

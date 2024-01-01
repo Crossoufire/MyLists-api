@@ -18,11 +18,12 @@ class BaseMediaQuery:
         self.media_type = media_type
 
         # Fetch models corresponding to <media_type>
-        media, media_list, media_genre, *media_mores = get_models_group(media_type)
+        media, media_list, media_genre, *media_mores, media_label = get_models_group(media_type)
         self.media = media
         self.media_list = media_list
         self.media_genre = media_genre
         self.media_mores = media_mores
+        self.media_label = media_label
 
         # Fetch <args> from request
         self.search = request.args.get("search")
@@ -41,8 +42,12 @@ class BaseMediaQuery:
 
         # Predefined attributes
         self.results = []
+        self.graph_data = []
+        self.labels = []
+        self.media_in_label = []
         self.pages = 0
         self.total = 0
+        self.title = None
 
         # Pagination
         self.all_status = self.media_list.Status.to_list(extra=True)
@@ -158,6 +163,7 @@ class SearchMediaQuery(BaseMediaQuery):
         # Add instances attributes
         self.total = paginate_results.total
         self.pages = paginate_results.pages
+        self.title = f"Search for: {self.search}"
 
         # Serialize results
         self.results = [item.to_dict() for item in paginate_results.items]
@@ -208,6 +214,21 @@ class MediaListQuery(SearchMediaQuery, ItemsMediaQuery):
     def return_results(self) -> Tuple[Dict, Dict]:
         if self.status == Status.SEARCH:
             self._search_query()
+        elif self.status == Status.STATS:
+            self.graph_data = self.media_list.get_media_stats(self.user)
+        elif self.status == Status.LABELS:
+            label_name = request.args.get("label_name")
+
+            if label_name:
+                media_data = self.media_label.query.filter(self.media_label.user_id == self.user.id,
+                                                           self.media_label.label == label_name).all()
+                self.media_in_label = [media.to_dict() for media in media_data]
+                self.total = len(self.media_in_label)
+                self.title = label_name
+            else:
+                media_data = self.media_label.query.filter(self.media_label.user_id == self.user.id).all()
+                self.labels = list(set(media.label for media in media_data))
+                self.total = len(self.labels)
         else:
             self._items_query()
 
@@ -215,6 +236,9 @@ class MediaListQuery(SearchMediaQuery, ItemsMediaQuery):
             media_list=self.results,
             total_media=self.total_media,
             common_ids=self.common_ids,
+            graph_data=self.graph_data,
+            labels=self.labels,
+            labels_media=self.media_in_label,
         )
 
         pagination = dict(
@@ -226,6 +250,7 @@ class MediaListQuery(SearchMediaQuery, ItemsMediaQuery):
             page=self.page,
             pages=self.pages,
             total=self.total,
+            title=self.title,
             all_status=self.all_status,
             all_genres=self.all_genres,
             all_sorting=list(self.all_sorting.keys()),

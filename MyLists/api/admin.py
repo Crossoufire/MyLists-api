@@ -15,7 +15,7 @@ def admin_auth():
     from MyLists.models.user_models import User
 
     if current_user.role == "user":
-        return abort(403, "You do not have the permission to access this page.")
+        return abort(404)
 
     json_data = request.get_json()
     admin = User.query.filter_by(id=1).first()
@@ -53,13 +53,16 @@ def admin_auth():
 def dashboard():
     from MyLists.models.user_models import User
 
+    if current_user.role == "user":
+        return abort(404)
+
     admin_token = request.cookies.get("admin_token")
     authorization = User.verify_elevated_token(admin_token)
     if not authorization:
         return abort(403, "You do not have the permission to access this page.")
 
-    data = [{"username": user.username, "role": user.role, "id": user.id}
-            for user in User.query.filter(User.id != 1).all()]
+    data = [{"username": user.username, "role": user.role, "id": user.id, "level": user.profile_level,
+             "notif": user.last_notif_read_time} for user in User.query.filter(User.id != 1).all()]
 
     return jsonify(data=data)
 
